@@ -2,9 +2,10 @@
 pragma solidity ^0.8.19;
 
 // import { console2 } from "forge-std/Test.sol"; // remove before deploy
-import { HatsModule } from "hats-module/HatsModule.sol";
+import { HatsEligibilityModule, HatsModule, IHatsEligibility } from "../lib/hats-module/src/HatsEligibilityModule.sol";
+import { IPublicLock } from "../src/interfaces/IPublicLock.sol";
 
-contract Module is HatsModule {
+contract UnlockEligibility is HatsEligibilityModule {
   /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
   //////////////////////////////////////////////////////////////*/
@@ -31,17 +32,21 @@ contract Module is HatsModule {
    *
    * For more, see here: https://github.com/Saw-mon-and-Natalie/clones-with-immutable-args
    *
-   * ----------------------------------------------------------------------+
-   * CLONE IMMUTABLE "STORAGE"                                             |
-   * ----------------------------------------------------------------------|
-   * Offset  | Constant          | Type    | Length  | Source              |
-   * ----------------------------------------------------------------------|
-   * 0       | IMPLEMENTATION    | address | 20      | HatsModule          |
-   * 20      | HATS              | address | 20      | HatsModule          |
-   * 40      | hatId             | uint256 | 32      | HatsModule          |
-   * 72+     | {other constants} | address | -       | {this}              |
-   * ----------------------------------------------------------------------+
+   * --------------------------------------------------------------------------+
+   * CLONE IMMUTABLE "STORAGE"                                                 |
+   * --------------------------------------------------------------------------|
+   * Offset  | Constant          | Type        | Length  | Source              |
+   * --------------------------------------------------------------------------|
+   * 0       | IMPLEMENTATION    | address     | 20      | HatsModule          |
+   * 20      | HATS              | address     | 20      | HatsModule          |
+   * 40      | hatId             | uint256     | 32      | HatsModule          |
+   * 72      | LOCK              | IPublicLock | 20      | {this}              |
+   * --------------------------------------------------------------------------+
    */
+
+  function LOCK() public pure returns (IPublicLock) {
+    return IPublicLock(_getArgAddress(72));
+  }
 
   /*//////////////////////////////////////////////////////////////
                             MUTABLE STATE
@@ -65,8 +70,21 @@ contract Module is HatsModule {
   }
 
   /*//////////////////////////////////////////////////////////////
-                        PUBLIC FUNCTIONS
+                      HATS ELIGIBILITY FUNCTION
   //////////////////////////////////////////////////////////////*/
+
+  /// @inheritdoc IHatsEligibility
+  function getWearerStatus(address _wearer, uint256 /* _hatId */ )
+    public
+    view
+    override
+    returns (bool eligible, bool standing)
+  {
+    // This module does not deal with standing, so we default to good standing (true)
+    standing = true;
+
+    eligible = LOCK().getHasValidKey(_wearer);
+  }
 
   /*//////////////////////////////////////////////////////////////
                           VIEW FUNCTIONS
