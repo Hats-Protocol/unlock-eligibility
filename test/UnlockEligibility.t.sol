@@ -23,7 +23,6 @@ contract UnlockEligibilityTest is Deploy, Test {
   UnlockEligibility public instance;
   bytes public otherImmutableArgs;
   bytes public initArgs;
-  uint256 public hatId;
   uint256 saltNonce;
 
   DeployInstance public deployInstance;
@@ -34,6 +33,14 @@ contract UnlockEligibilityTest is Deploy, Test {
   address public feeSplitRecipient = makeAddr("fee split recipient");
   uint256 public feeSplitPercentage = 1000; // 10%
   address public lockManager = makeAddr("lock manager");
+
+  address public org = makeAddr("org");
+  address public wearer = makeAddr("wearer");
+  address public nonWearer = makeAddr("non-wearer");
+
+  uint256 public tophat;
+  uint256 public adminHat; // should be worn by {instance}
+  uint256 public targetHat; // should be worn by {wearer}
 
   // lock init data
   UnlockEligibility.LockConfig lockConfig;
@@ -54,14 +61,8 @@ contract WithInstanceTest is UnlockEligibilityTest {
   function setUp() public virtual override {
     super.setUp();
 
-    // set up the Unlock lock
-    lock = IPublicLock(makeAddr("Unlock lock")); // TODO
-
     // set the salt nonce
     saltNonce = 1;
-
-    // set the test hat
-    hatId = 10;
 
     // set lock init data
     lockConfig = UnlockEligibility.LockConfig({
@@ -74,10 +75,25 @@ contract WithInstanceTest is UnlockEligibilityTest {
       lockName: "Unlock Eligibility Test"
     });
 
-    // deploy the instance using the script
-    deployInstance =
-      new DeployInstance(false, address(implementation), hatId, address(unlockFactory), saltNonce, lockConfig);
+    // set up the hats
+    tophat = HATS.mintTopHat(org, "test", "test");
+    vm.startPrank(org);
+    adminHat = HATS.createHat(tophat, "adminHat", 1, address(1), address(1), true, "test");
+    targetHat = HATS.createHat(adminHat, "targetHat", 1, address(1), address(1), true, "test");
+    vm.stopPrank();
+
+    // deploy the instance using the script; this will also create a new lock
+    deployInstance = new DeployInstance();
+    deployInstance.prepare(false, address(implementation), targetHat, address(unlockFactory), saltNonce, lockConfig);
     instance = deployInstance.run();
+
+    // mint the adminHat to the instance so that it can mint the targetHat
+    vm.prank(org);
+    HATS.mintHat(adminHat, address(instance));
+
+    // update the targetHat's eligibility to the instance
+    vm.prank(org);
+    HATS.changeHatEligibility(targetHat, address(instance));
   }
 }
 
@@ -105,7 +121,7 @@ contract Deployment is WithInstanceTest {
   }
 
   function test_hatId() public view {
-    assertEq(instance.hatId(), hatId);
+    assertEq(instance.hatId(), targetHat);
   }
 
   function test_feeSplitPercentage() public view {
@@ -116,8 +132,10 @@ contract Deployment is WithInstanceTest {
     assertEq(instance.FEE_SPLIT_RECIPIENT(), feeSplitRecipient);
   }
 
-  function test_createLock() public view {
-    IPublicLock lock = IPublicLock(instance.lock());
+  function test_createLock() public {
+    lock = IPublicLock(instance.lock());
+
+    // lock config
     assertTrue(lock.isLockManager(address(lockManager)));
     assertFalse(lock.isLockManager(address(instance)));
     assertEq(lock.keyPrice(), lockConfig.keyPrice);
@@ -125,15 +143,18 @@ contract Deployment is WithInstanceTest {
     assertEq(lock.expirationDuration(), lockConfig.expirationDuration);
     assertEq(lock.name(), lockConfig.lockName);
     assertEq(lock.tokenAddress(), lockConfig.tokenAddress);
-
     assertEq(lock.onKeyPurchaseHook(), address(instance));
     assertEq(lock.onKeyTransferHook(), address(instance));
 
+    // lock version
     if (lockConfig.version == 0) {
       assertEq(lock.publicLockVersion(), 14); // the default version
     } else {
       assertEq(lock.publicLockVersion(), lockConfig.version);
     }
+
+    // lock price in module
+    assertEq(instance.keyPrice(), lockConfig.keyPrice);
   }
 
   function test_createLockWithCustomVersion() public {
@@ -148,7 +169,7 @@ contract Deployment is WithInstanceTest {
     });
 
     // deploy a new instance, using a new salt nonce to avoid collisions
-    deployInstance.prepare(false, address(implementation), hatId, address(unlockFactory), 2, lockConfig);
+    deployInstance.prepare(false, address(implementation), targetHat, address(unlockFactory), 2, lockConfig);
     instance = deployInstance.run();
 
     assertEq(instance.lock().publicLockVersion(), lockConfig.version);
@@ -156,4 +177,82 @@ contract Deployment is WithInstanceTest {
 }
 
 // TODO
-contract UnitTests is WithInstanceTest { }
+contract GetUnlockContract is WithInstanceTest {
+  function _forkNetwork(string memory _network) internal {
+    // TODO block numbers
+    uint256 blockNumber;
+    fork = vm.createSelectFork(vm.rpcUrl(_network), blockNumber);
+  }
+
+  function test_happy_default() public { }
+
+  function test_happy_nonDefault() public { }
+
+  function test_revert_nonDefault() public { }
+}
+
+contract KeyPurchasePrice is WithInstanceTest {
+  function test_keyPurchasePrice() public view {
+    uint256 price = instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
+    assertEq(price, lockConfig.keyPrice);
+  }
+}
+
+contract OnKeyPurchase is WithInstanceTest {
+  function test_happy() public { } // TODO
+
+  function test_revert_notLock() public {
+    vm.expectRevert(UnlockEligibility.NotLock.selector);
+    instance.onKeyPurchase(0, address(0), wearer, address(0), bytes(""), 0, 0);
+  }
+}
+
+contract OnKeyTransfer is WithInstanceTest {
+  function test_happy() public { } // TODO
+
+  function test_revert_notLock() public {
+    vm.expectRevert(UnlockEligibility.NotLock.selector);
+    instance.onKeyTransfer(address(0), 0, address(0), address(0), address(0), 0);
+  }
+}
+
+// TODO
+contract GetWearerStatus is WithInstanceTest {
+  function _purchaseSingleKey(IPublicLock _lock, address _recipient) internal {
+    // give the recipient some ETH
+    deal(_recipient, 1 ether);
+
+    // set up the purchase data
+    uint256[] memory _values = new uint256[](1);
+    _values[0] = _lock.keyPrice();
+    address[] memory _recipients = new address[](1);
+    _recipients[0] = _recipient;
+    address[] memory _referrers = new address[](1);
+    _referrers[0] = address(0);
+    address[] memory _keyManagers = new address[](1);
+    _keyManagers[0] = address(0);
+    bytes[] memory _data = new bytes[](1);
+    _data[0] = abi.encode(0);
+
+    // make the purchase, passing in the correct eth value
+    vm.prank(_recipient);
+    _lock.purchase{ value: _values[0] }(_values, _recipients, _referrers, _keyManagers, _data);
+  }
+
+  function test_purchaseKey() public {
+    // get the lock
+    lock = IPublicLock(instance.lock());
+
+    // purchase a key for the wearer
+    _purchaseSingleKey(lock, wearer);
+
+    // the wearer should have both the key and the hat
+    assertTrue(lock.getHasValidKey(wearer));
+    assertTrue(HATS.isWearerOfHat(wearer, targetHat));
+
+    // the wearer should be eligible
+    (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
+    assertTrue(eligible);
+    assertTrue(standing);
+  }
+}
