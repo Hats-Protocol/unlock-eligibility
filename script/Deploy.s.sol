@@ -12,11 +12,15 @@ contract Deploy is Script {
   // default values
   bool internal _verbose = true;
   string internal _version = "0.1.0"; // increment this with each new deployment
+  address internal _feeSplitRecipient;
+  uint256 internal _feeSplitPercentage;
 
   /// @dev Override default values, if desired
-  function prepare(bool verbose, string memory version) public {
+  function prepare(bool verbose, string memory version, address feeSplitRecipient, uint256 feeSplitPercentage) public {
     _verbose = verbose;
     _version = version;
+    _feeSplitRecipient = feeSplitRecipient;
+    _feeSplitPercentage = feeSplitPercentage;
   }
 
   /// @dev Set up the deployer via their private key from the environment
@@ -43,7 +47,7 @@ contract Deploy is Script {
      *       never differs regardless of where its being compiled
      *    2. The provided salt, `SALT`
      */
-    implementation = new UnlockEligibility{ salt: SALT }(_version /* insert constructor args here */ );
+    implementation = new UnlockEligibility{ salt: SALT }(_version, _feeSplitRecipient, _feeSplitPercentage);
 
     vm.stopBroadcast();
 
@@ -60,19 +64,36 @@ contract DeployInstance is Script {
   address internal _implementation;
   uint256 internal _saltNonce = 1;
   uint256 internal _hatId;
-  address internal _lock;
+  address internal _unlockFactory;
+  UnlockEligibility.LockConfig internal _lockConfig;
 
-  constructor(bool verbose, address implementation, uint256 hatId, address lock, uint256 saltNonce) {
-    prepare(verbose, implementation, hatId, lock, saltNonce);
+  /// @dev Constructor, setting default values
+  constructor(
+    bool verbose,
+    address implementation,
+    uint256 hatId,
+    address unlockFactory,
+    uint256 saltNonce,
+    UnlockEligibility.LockConfig memory lockConfig
+  ) {
+    prepare(verbose, implementation, hatId, unlockFactory, saltNonce, lockConfig);
   }
 
   /// @dev Override default values, if desired
-  function prepare(bool verbose, address implementation, uint256 hatId, address lock, uint256 saltNonce) public {
+  function prepare(
+    bool verbose,
+    address implementation,
+    uint256 hatId,
+    address unlockFactory,
+    uint256 saltNonce,
+    UnlockEligibility.LockConfig memory lockConfig
+  ) public {
     _verbose = verbose;
     _implementation = implementation;
     _hatId = hatId;
+    _unlockFactory = unlockFactory;
     _saltNonce = saltNonce;
-    _lock = lock;
+    _lockConfig = lockConfig;
   }
 
   /// @dev Set up the deployer via their private key from the environment
@@ -95,8 +116,8 @@ contract DeployInstance is Script {
       factory.createHatsModule(
         _implementation,
         _hatId,
-        abi.encodePacked(_lock), // other immutable args
-        abi.encode(), // init data
+        abi.encodePacked(_unlockFactory), // other immutable args
+        abi.encode(_lockConfig), // init data
         _saltNonce
       )
     );

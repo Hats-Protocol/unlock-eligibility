@@ -4,3 +4,6 @@
 [submodule "lib/hats-module"]
 	path = lib/hats-module
 	url = https://github.com/hats-protocol/hats-module
+[submodule "lib/unlock"]
+	path = lib/unlock
+	url = https://github.com/unlock-protocol/unlock
