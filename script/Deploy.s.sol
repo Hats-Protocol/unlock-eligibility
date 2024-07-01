@@ -11,9 +11,9 @@ contract Deploy is Script {
 
   // default values
   bool internal _verbose = true;
-  string internal _version = "0.1.0"; // increment this with each new deployment
-  address internal _feeSplitRecipient;
-  uint256 internal _feeSplitPercentage;
+  string internal _version = "test1"; // increment this with each new deployment
+  address internal _feeSplitRecipient = 0x018e494352a3E68e16d03ed976Fd64134bd82E72;
+  uint256 internal _feeSplitPercentage = 1000; // 10%
 
   /// @dev Override default values, if desired
   function prepare(bool verbose, string memory version, address feeSplitRecipient, uint256 feeSplitPercentage) public {
@@ -61,23 +61,20 @@ contract DeployInstance is Script {
 
   // default values
   bool internal _verbose = true;
-  address internal _implementation;
+  address internal _implementation = 0xBDE01a70419856bfCe2fC7B87f147577F67D593a; // test1
   uint256 internal _saltNonce = 1;
-  uint256 internal _hatId;
-  address internal _unlockFactory;
+  uint256 internal _hatId = 0x0000001f00010001000000000000000000000000000000000000000000000000;
+  address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
   UnlockEligibility.LockConfig internal _lockConfig;
 
-  /// @dev Constructor, setting default values
-  constructor(
-    bool verbose,
-    address implementation,
-    uint256 hatId,
-    address unlockFactory,
-    uint256 saltNonce,
-    UnlockEligibility.LockConfig memory lockConfig
-  ) {
-    prepare(verbose, implementation, hatId, unlockFactory, saltNonce, lockConfig);
-  }
+  // lock config defaults
+  uint256 internal _expirationDuration = 7 days;
+  address internal _tokenAddress = 0x0000000000000000000000000000000000000000; // ETH
+  uint256 internal _keyPrice = 0.0001 ether;
+  uint256 internal _maxNumberOfKeys = 10_000;
+  address internal _lockManager = 0x624123ec4A9f48Be7AA8a307a74381E4ea7530D4;
+  uint16 internal _version = 0; // will default to 14
+  string internal _lockName = "Hat Lock Test 1";
 
   /// @dev Override default values, if desired
   function prepare(
@@ -105,12 +102,23 @@ contract DeployInstance is Script {
   function _log(string memory prefix) internal view {
     if (_verbose) {
       console2.log(string.concat(prefix, "Instance:"), address(instance));
+      console2.log(string.concat("Lock"), address(instance.lock()));
     }
   }
 
   /// @dev Deploy the contract to a deterministic address via forge's create2 deployer factory.
   function run() public virtual returns (UnlockEligibility) {
     vm.startBroadcast(deployer());
+
+    // use the default values if the prepared lockConfig is empty
+    if (_lockConfig.expirationDuration == 0) {
+      _lockConfig.expirationDuration = _expirationDuration;
+      _lockConfig.keyPrice = _keyPrice;
+      _lockConfig.maxNumberOfKeys = _maxNumberOfKeys;
+      _lockConfig.lockManager = _lockManager;
+      _lockConfig.version = _version;
+      _lockConfig.lockName = _lockName;
+    }
 
     instance = UnlockEligibility(
       factory.createHatsModule(

@@ -14,6 +14,7 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   //////////////////////////////////////////////////////////////*/
 
   error UnsupportedNetwork();
+  error NotLock();
 
   /*//////////////////////////////////////////////////////////////
                               EVENTS
@@ -37,6 +38,15 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
                             CONSTANTS 
   //////////////////////////////////////////////////////////////*/
 
+  /// @notice The default version of the lock contract deploy along with an instance of this module
+  uint16 public constant DEFAULT_LOCK_VERSION = 14;
+
+  /// @notice The address to split key purchase fees to
+  address public immutable FEE_SPLIT_RECIPIENT;
+
+  /// @notice The percentage of key purchase fees to split, in basis points (10000 = 100%)
+  uint256 public immutable FEE_SPLIT_PERCENTAGE;
+
   /**
    * This contract is a clone with immutable args, which means that it is deployed with a set of
    * immutable storage variables (ie constants). Accessing these constants is cheaper than accessing
@@ -58,12 +68,12 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
    * 72      | UNLOCK            | address     | 20      | {this}              |
    * --------------------------------------------------------------------------+
    */
+
+  /// @dev The configured Unlock factory contract address. If empty, the factory used will be determined by the mapping
+  /// defined within {getUnlockContract}.
   function _UNLOCK() internal pure returns (address) {
     return (_getArgAddress(72));
   }
-
-  address public immutable FEE_SPLIT_RECIPIENT;
-  uint256 public immutable FEE_SPLIT_PERCENTAGE; // in basis points (10000 = 100%)
 
   /*//////////////////////////////////////////////////////////////
                             MUTABLE STATE
@@ -71,11 +81,16 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
 
   IPublicLock public lock;
 
+  uint256 public keyPrice;
+
   /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
   //////////////////////////////////////////////////////////////*/
 
   /// @notice Deploy the implementation contract and set its version
+  /// @param _version The version of the implementation contract
+  /// @param _feeSplitRecipient The address to split fees to
+  /// @param _feeSplitPercentage The percentage of fees to split, in basis points (10000 = 100%)
   /// @dev This is only used to deploy the implementation contract, and should not be used to deploy clones
   constructor(string memory _version, address _feeSplitRecipient, uint256 _feeSplitPercentage) HatsModule(_version) {
     FEE_SPLIT_RECIPIENT = _feeSplitRecipient;
@@ -86,26 +101,13 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
                             INITIALIZOR
   //////////////////////////////////////////////////////////////*/
 
-  /*
-    SPEC for the full flow
-
-    0. decode lock contract confige from _initData ✅
-    1. encode lock init data with `initialize` signature ✅
-    2. create the lock contract with the config ✅
-    3. store the lock address ✅
-    4. set this contract as an onPurchase and onTransfer hook for the lock — setEventHooks() ✅
-    5. set referrer fee ✅
-    6. transfer lock manager role to the configured address?? ✅
-    
-  */
-
   /// @inheritdoc HatsModule
   function _setUp(bytes calldata _initData) internal override {
     // decode init data
     LockConfig memory lockConfig = abi.decode(_initData, (LockConfig));
 
-    // determine the lock version to use, defaulting to 14
-    uint16 version_ = lockConfig.version == 0 ? 14 : lockConfig.version;
+    // determine the lock version to use, falling back to the default version if the given version is 0
+    uint16 version_ = lockConfig.version == 0 ? DEFAULT_LOCK_VERSION : lockConfig.version;
 
     // encode the lock init data
     bytes memory lockInitData = abi.encodeWithSignature(
@@ -139,6 +141,9 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     // QUESTION is the the right approach?
     lock.addLockManager(lockConfig.lockManager);
     lock.renounceLockManager();
+
+    // store the key price for retrieval by the {keyPurchasePrice} hook
+    keyPrice = lockConfig.keyPrice;
   }
 
   /*//////////////////////////////////////////////////////////////
@@ -159,16 +164,17 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   }
 
   /*//////////////////////////////////////////////////////////////
-                      UNLOCK HOOK FUNCTIONS
+                        UNLOCK HOOK FUNCTIONS
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc ILockKeyPurchaseHook
-  function keyPurchasePrice(address from, address recipient, address referrer, bytes calldata data)
-    external
-    view
-    returns (uint256 minKeyPrice)
-  {
-    // TODO
+  function keyPurchasePrice(
+    address, /* from */
+    address, /* recipient */
+    address, /* referrer */
+    bytes calldata /* data */
+  ) external view returns (uint256 minKeyPrice) {
+    minKeyPrice = keyPrice;
   }
 
   /// @inheritdoc ILockKeyPurchaseHook
@@ -181,6 +187,9 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     uint256, /* minKeyPrice */
     uint256 /* pricePaid */
   ) external {
+    // caller must be the lock contract
+    _checkIsLock(msg.sender);
+
     /// @dev Will revert if this contract is not an admin of the hat
     HATS().mintHat(hatId(), recipient);
   }
@@ -194,6 +203,9 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     address to,
     uint256 /* expirationTimestamp */
   ) external {
+    // caller must be the lock contract
+    _checkIsLock(msg.sender);
+
     /// @dev We use the revoke & mint approach here rather than transfer in case the hat is immutable
 
     // Revoke the hat from the from address (current wearer) without putting them in bad standing
@@ -204,6 +216,8 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     // Since the key has already been transferred, the new wearer is eligible and so minting will succeed
     /// @dev Will revert if this contract is not an admin of the hat
     HATS().mintHat(hatId(), to);
+
+    // QUESTION: or should we disallow transfers?
   }
 
   /*//////////////////////////////////////////////////////////////
@@ -228,6 +242,11 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   /*//////////////////////////////////////////////////////////////
                         INTERNAL FUNCTIONS
   //////////////////////////////////////////////////////////////*/
+
+  /// @dev Reverts if a given address is not the {lock} contract
+  function _checkIsLock(address _caller) internal view {
+    if (_caller != address(lock)) revert NotLock();
+  }
 
   /*//////////////////////////////////////////////////////////////
                             MODIFERS
