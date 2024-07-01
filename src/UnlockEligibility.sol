@@ -89,13 +89,14 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   /*
     SPEC for the full flow
 
-    0. decode lock contract confige from _initData ✅
+    0. decode lock contract config from _initData ✅
     1. encode lock init data with `initialize` signature ✅
     2. create the lock contract with the config ✅
     3. store the lock address ✅
     4. set this contract as an onPurchase and onTransfer hook for the lock — setEventHooks() ✅
     5. set referrer fee ✅
-    6. transfer lock manager role to the configured address?? ✅
+    6. add lock manager role to the configured address ✅
+    7. revokes itself as a lock manager ✅
     
   */
 
@@ -135,9 +136,9 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     // set referrer fee
     lock.setReferrerFee(FEE_SPLIT_RECIPIENT, FEE_SPLIT_PERCENTAGE);
 
-    // transfer lock manager role to the configured address
-    // QUESTION is the the right approach?
+    // add lock manager role to the configured address
     lock.addLockManager(lockConfig.lockManager);
+    // revokes itself lock manager
     lock.renounceLockManager();
   }
 
@@ -168,7 +169,8 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     view
     returns (uint256 minKeyPrice)
   {
-    // TODO
+    // Returns the lock's key price (unless we want to have a custom price for specific hat wearerrs)
+    return lock.keyPrice();
   }
 
   /// @inheritdoc ILockKeyPurchaseHook
