@@ -132,7 +132,7 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
       _onKeyCancelHook: address(0),
       _onValidKeyHook: address(0),
       _onTokenURIHook: address(0),
-      _onKeyTransferHook: address(0),
+      _onKeyTransferHook: address(this),
       _onKeyExtendHook: address(0),
       _onKeyGrantHook: address(0)
     });
