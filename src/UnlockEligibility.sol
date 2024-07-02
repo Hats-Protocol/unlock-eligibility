@@ -6,21 +6,20 @@ import { HatsEligibilityModule, HatsModule, IHatsEligibility } from "../lib/hats
 import { IPublicLock } from "../lib/unlock/smart-contracts/contracts/interfaces/IPublicLock.sol";
 import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnlock.sol";
 import { ILockKeyPurchaseHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyPurchaseHook.sol";
-import { ILockKeyTransferHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyTransferHook.sol";
 
-contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILockKeyTransferHook {
+contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
   /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
   //////////////////////////////////////////////////////////////*/
 
+  /// @dev Thrown when this contract is not aware of the Unlock factory for the current network
   error UnsupportedNetwork();
   error NotLock();
   error NotTransferable();
   error InvalidReferrerFee();
 
-  /*//////////////////////////////////////////////////////////////
-                              EVENTS
-  //////////////////////////////////////////////////////////////*/
+  /// @dev Thrown when a lock-only function is called by an address that is not the lock contract
+  error NotLock();
 
   /*//////////////////////////////////////////////////////////////
                             DATA MODELS
@@ -71,8 +70,8 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
    * --------------------------------------------------------------------------+
    */
 
-  /// @dev The configured Unlock factory contract address. If empty, the factory used will be determined by the mapping
-  /// defined within {getUnlockContract}.
+  /// @dev The configured Unlock factory contract address. Overrides the default address for each chain as set in
+  /// {getUnlockContract}.
   function _UNLOCK() internal pure returns (address) {
     return (_getArgAddress(72));
   }
@@ -81,6 +80,7 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
                             MUTABLE STATE
   //////////////////////////////////////////////////////////////*/
 
+  /// @notice The Unlock Protocol lock contract that is created along with this module and coupled to the hat
   IPublicLock public lock;
 
   /*//////////////////////////////////////////////////////////////
@@ -123,13 +123,13 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     // create the new lock
     lock = IPublicLock(getUnlockContract().createUpgradeableLockAtVersion(lockInitData, version_));
 
-    // set this contract as a hook for keyPurchase and keyTransfer
+    // set this contract as a hook for onKeyPurchase
     lock.setEventHooks({
       _onKeyPurchaseHook: address(this),
       _onKeyCancelHook: address(0),
       _onValidKeyHook: address(0),
       _onTokenURIHook: address(0),
-      _onKeyTransferHook: address(this),
+      _onKeyTransferHook: address(0),
       _onKeyExtendHook: address(0),
       _onKeyGrantHook: address(0)
     });
@@ -212,19 +212,50 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
                           VIEW FUNCTIONS
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Gets the address of the Unlock factory contract, falling back to hardcoded defaults for a specific set of
-  /// networks. This facilitates lazy configuration for supported networks, while also retaining configuration
-  /// flexibility.
-  /// @dev https://docs.unlock-protocol.com/core-protocol/unlock/networks
+  /// @notice Gets the address of the Unlock factory contract, falling back to hardcoded defaults for each
+  /// EVM-equivalent network supported by Unlock Protocol:
+  /// https://docs.unlock-protocol.com/core-protocol/unlock/networks
+  /// @dev This facilitates lazy configuration for supported networks, while also retaining configuration flexibility.
   function getUnlockContract() public view returns (IUnlock) {
     if (_UNLOCK() > address(0)) {
       return IUnlock(_UNLOCK());
     } else {
       // return the address of the factory based on the chainid
+
       if (block.chainid == 1) {
         return IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA);
+      } // ethereum
+      if (block.chainid == 11_155_111) {
+        return IUnlock(0x36b34e10295cCE69B652eEB5a8046041074515Da);
+      } // sepolia
+      if (block.chainid == 10) {
+        return IUnlock(0x99b1348a9129ac49c6de7F11245773dE2f51fB0c);
+      } // optimism
+      if (block.chainid == 42_161) {
+        return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963);
+      } // arbitrum
+      if (block.chainid == 8453) {
+        return IUnlock(0xd0b14797b9D08493392865647384974470202A78);
+      } // base
+      if (block.chainid == 84_532) {
+        return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89);
+      } // base sepolia
+      if (block.chainid == 137) {
+        return IUnlock(0xE8E5cd156f89F7bdB267EabD5C43Af3d5AF2A78f);
+      } // polygon
+      if (block.chainid == 42_220) {
+        return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963);
+      } // celo
+      if (block.chainid == 100) {
+        return IUnlock(0x1bc53f4303c711cc693F6Ec3477B83703DcB317f);
+      } // gnosis
+      if (block.chainid == 59_144) {
+        return IUnlock(0x70B3c9Dd9788570FAAb24B92c3a57d99f8186Cc7);
+      } // linea
+      if (block.chainid == 534_352) {
+        return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89);
       }
-      // TODO add other networks
+      // scroll
       else {
         revert UnsupportedNetwork();
       }
@@ -239,8 +270,4 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   function _checkIsLock(address _caller) internal view {
     if (_caller != address(lock)) revert NotLock();
   }
-
-  /*//////////////////////////////////////////////////////////////
-                            MODIFERS
-  //////////////////////////////////////////////////////////////*/
 }

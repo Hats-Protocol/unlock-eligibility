@@ -7,6 +7,7 @@ import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnl
 import { HatsModuleFactory, IHats } from "hats-module/utils/DeployFunctions.sol";
 import { Deploy, DeployInstance } from "../script/Deploy.s.sol";
 import { IHats } from "hats-protocol/Interfaces/IHats.sol";
+import { HatsErrors } from "hats-protocol/Interfaces/HatsErrors.sol";
 
 contract UnlockEligibilityTest is Deploy, Test {
   /// @dev Inherit from DeployPrecompiled instead of Deploy if working with pre-compiled contracts
@@ -95,6 +96,38 @@ contract WithInstanceTest is UnlockEligibilityTest {
     vm.prank(org);
     HATS.changeHatEligibility(targetHat, address(instance));
   }
+
+  /// @dev Purchase a single key from a given lock for a given recipient
+  /// @return The tokenId of the purchased key
+  function _purchaseSingleKey(IPublicLock _lock, address _recipient) internal returns (uint256) {
+    // give the recipient some ETH
+    deal(_recipient, 1 ether);
+
+    // set up the purchase data
+    uint256[] memory _values = new uint256[](1);
+    _values[0] = _lock.keyPrice();
+    address[] memory _recipients = new address[](1);
+    _recipients[0] = _recipient;
+    address[] memory _referrers = new address[](1);
+    _referrers[0] = address(0);
+    address[] memory _keyManagers = new address[](1);
+    _keyManagers[0] = address(0);
+    bytes[] memory _data = new bytes[](1);
+    _data[0] = abi.encode(0);
+
+    // the return array
+    uint256[] memory _tokenIds = new uint256[](1);
+
+    // make the purchase, passing in the correct eth value
+    vm.prank(_recipient);
+    _tokenIds = _lock.purchase{ value: _values[0] }(_values, _recipients, _referrers, _keyManagers, _data);
+
+    return _tokenIds[0];
+  }
+
+  function _getLock() internal view returns (IPublicLock) {
+    return IPublicLock(instance.lock());
+  }
 }
 
 contract Deployment is WithInstanceTest {
@@ -144,7 +177,6 @@ contract Deployment is WithInstanceTest {
     assertEq(lock.name(), lockConfig.lockName);
     assertEq(lock.tokenAddress(), lockConfig.tokenAddress);
     assertEq(lock.onKeyPurchaseHook(), address(instance));
-    assertEq(lock.onKeyTransferHook(), address(instance));
 
     // lock version
     if (lockConfig.version == 0) {
@@ -176,21 +208,6 @@ contract Deployment is WithInstanceTest {
   }
 }
 
-// TODO
-contract GetUnlockContract is WithInstanceTest {
-  function _forkNetwork(string memory _network) internal {
-    // TODO block numbers
-    uint256 blockNumber;
-    fork = vm.createSelectFork(vm.rpcUrl(_network), blockNumber);
-  }
-
-  function test_happy_default() public { }
-
-  function test_happy_nonDefault() public { }
-
-  function test_revert_nonDefault() public { }
-}
-
 contract KeyPurchasePrice is WithInstanceTest {
   function test_keyPurchasePrice() public view {
     uint256 price = instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
@@ -199,7 +216,19 @@ contract KeyPurchasePrice is WithInstanceTest {
 }
 
 contract OnKeyPurchase is WithInstanceTest {
-  function test_happy() public { } // TODO
+  function test_happy() public {
+    IPublicLock lock = _getLock();
+
+    // should revert because we're shortcutting the typical flow and calling this function without actually purchasing a
+    // key, and so the wearer is not eligible and therefore cannot be minted the hat
+    vm.expectRevert(HatsErrors.NotEligible.selector);
+
+    vm.prank(address(lock));
+    instance.onKeyPurchase(0, address(0), wearer, address(0), bytes(""), 0, 0);
+
+    // the
+    assertFalse(HATS.isWearerOfHat(wearer, targetHat));
+  }
 
   function test_revert_notLock() public {
     vm.expectRevert(UnlockEligibility.NotLock.selector);
@@ -207,42 +236,14 @@ contract OnKeyPurchase is WithInstanceTest {
   }
 }
 
-contract OnKeyTransfer is WithInstanceTest {
-  function test_happy() public { } // TODO
-
-  function test_revert_notLock() public {
-    vm.expectRevert(UnlockEligibility.NotLock.selector);
-    instance.onKeyTransfer(address(0), 0, address(0), address(0), address(0), 0);
-  }
-}
-
-// TODO
 contract GetWearerStatus is WithInstanceTest {
-  function _purchaseSingleKey(IPublicLock _lock, address _recipient) internal {
-    // give the recipient some ETH
-    deal(_recipient, 1 ether);
+  function setUp() public override {
+    super.setUp();
 
-    // set up the purchase data
-    uint256[] memory _values = new uint256[](1);
-    _values[0] = _lock.keyPrice();
-    address[] memory _recipients = new address[](1);
-    _recipients[0] = _recipient;
-    address[] memory _referrers = new address[](1);
-    _referrers[0] = address(0);
-    address[] memory _keyManagers = new address[](1);
-    _keyManagers[0] = address(0);
-    bytes[] memory _data = new bytes[](1);
-    _data[0] = abi.encode(0);
-
-    // make the purchase, passing in the correct eth value
-    vm.prank(_recipient);
-    _lock.purchase{ value: _values[0] }(_values, _recipients, _referrers, _keyManagers, _data);
+    lock = _getLock();
   }
 
-  function test_purchaseKey() public {
-    // get the lock
-    lock = IPublicLock(instance.lock());
-
+  function test_purchased_unexpired() public {
     // purchase a key for the wearer
     _purchaseSingleKey(lock, wearer);
 
@@ -254,5 +255,58 @@ contract GetWearerStatus is WithInstanceTest {
     (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
     assertTrue(eligible);
     assertTrue(standing);
+  }
+
+  function test_purchased_expired() public {
+    // purchase a key for the wearer
+    uint256 key = _purchaseSingleKey(lock, wearer);
+
+    // the wearer should be eligible
+
+    (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
+    assertTrue(eligible);
+    assertTrue(standing);
+
+    // get the expiration timestamp for the key
+    uint256 expiration = lock.keyExpirationTimestampFor(key);
+
+    // warp the time forward to the just before expiration
+    vm.warp(expiration - 1);
+
+    // the wearer should still be eligible
+    (eligible, standing) = instance.getWearerStatus(wearer, targetHat);
+    assertTrue(eligible);
+    assertTrue(standing);
+
+    // warp the time forward to the expiration
+    vm.warp(expiration);
+
+    // the wearer should not be eligible
+    (eligible, standing) = instance.getWearerStatus(wearer, targetHat);
+    assertFalse(eligible);
+    assertTrue(standing);
+  }
+
+  function test_unpurchased() public view {
+    // the wearer should not have a key
+    assertFalse(lock.getHasValidKey(wearer));
+
+    // the wearer should not be eligible
+    (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
+    assertFalse(eligible);
+    assertTrue(standing);
+  }
+}
+
+contract Transfers is WithInstanceTest {
+  function test_revert_transfer() public {
+    lock = _getLock();
+
+    // purchase a key for the wearer
+    uint256 tokenId = _purchaseSingleKey(lock, wearer);
+
+    // transfer the key to the non-wearer, expecting a revert
+    vm.expectRevert();
+    lock.transferFrom(wearer, nonWearer, tokenId);
   }
 }
