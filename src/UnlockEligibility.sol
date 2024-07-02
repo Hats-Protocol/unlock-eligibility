@@ -15,6 +15,12 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
   /// @dev Thrown when this contract is not aware of the Unlock factory for the current network
   error UnsupportedNetwork();
 
+  /// @dev Thrown when a trying to transfer a key from the lock
+  error NotTransferable();
+
+  // @dev Thrown when the referrer fee is not set for Hats
+  error InvalidReferrerFee();
+
   /// @dev Thrown when a lock-only function is called by an address that is not the lock contract
   error NotLock();
 
@@ -80,10 +86,6 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
   /// @notice The Unlock Protocol lock contract that is created along with this module and coupled to the hat
   IPublicLock public lock;
 
-  /// @notice The price of a key for the lock
-  /// @dev Stored here to facilitate the {keyPurchasePrice} hook
-  uint256 public keyPrice;
-
   /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
   //////////////////////////////////////////////////////////////*/
@@ -130,7 +132,7 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
       _onKeyCancelHook: address(0),
       _onValidKeyHook: address(0),
       _onTokenURIHook: address(0),
-      _onKeyTransferHook: address(0),
+      _onKeyTransferHook: address(this),
       _onKeyExtendHook: address(0),
       _onKeyGrantHook: address(0)
     });
@@ -138,13 +140,10 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
     // set referrer fee
     lock.setReferrerFee(FEE_SPLIT_RECIPIENT, FEE_SPLIT_PERCENTAGE);
 
-    // transfer lock manager role to the configured address
-    // QUESTION is the the right approach?
+    // add lock manager role to the configured address
     lock.addLockManager(lockConfig.lockManager);
+    // revokes itself lock manager
     lock.renounceLockManager();
-
-    // store the key price for retrieval by the {keyPurchasePrice} hook
-    keyPrice = lockConfig.keyPrice;
   }
 
   /*//////////////////////////////////////////////////////////////
@@ -169,13 +168,18 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc ILockKeyPurchaseHook
-  function keyPurchasePrice(
-    address, /* from */
-    address, /* recipient */
-    address, /* referrer */
-    bytes calldata /* data */
-  ) external view returns (uint256 minKeyPrice) {
-    minKeyPrice = keyPrice;
+  function keyPurchasePrice(address from, address recipient, address referrer, bytes calldata data)
+    external
+    view
+    returns (uint256 minKeyPrice)
+  {
+    // Check if referrer fee is correct. Fail minting if incorrect.
+    if (lock.referrerFees(FEE_SPLIT_RECIPIENT) != FEE_SPLIT_PERCENTAGE) {
+      revert InvalidReferrerFee();
+    }
+
+    // Returns the lock's key price
+    return lock.keyPrice();
   }
 
   /// @inheritdoc ILockKeyPurchaseHook
@@ -195,6 +199,18 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
     HATS().mintHat(hatId(), recipient);
   }
 
+  /// @inheritdoc ILockKeyTransferHook
+  function onKeyTransfer(
+    address, /* lockAddress */
+    uint256, /* tokenId */
+    address, /* operator */
+    address from,
+    address to,
+    uint256 /* expirationTimestamp */
+  ) external {
+    revert NotTransferable();
+  }
+
   /*//////////////////////////////////////////////////////////////
                           VIEW FUNCTIONS
   //////////////////////////////////////////////////////////////*/
@@ -208,19 +224,44 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
       return IUnlock(_UNLOCK());
     } else {
       // return the address of the factory based on the chainid
-      if (block.chainid == 1) return IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA); // ethereum
-      if (block.chainid == 11_155_111) return IUnlock(0x36b34e10295cCE69B652eEB5a8046041074515Da); // sepolia
-      if (block.chainid == 10) return IUnlock(0x99b1348a9129ac49c6de7F11245773dE2f51fB0c); // optimism
-      if (block.chainid == 42_161) return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963); // arbitrum
-      if (block.chainid == 8453) return IUnlock(0xd0b14797b9D08493392865647384974470202A78); // base
-      if (block.chainid == 84_532) return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89); // base sepolia
-      if (block.chainid == 137) return IUnlock(0xE8E5cd156f89F7bdB267EabD5C43Af3d5AF2A78f); // polygon
-      if (block.chainid == 42_220) return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963); // celo
-      if (block.chainid == 100) return IUnlock(0x1bc53f4303c711cc693F6Ec3477B83703DcB317f); // gnosis
-      if (block.chainid == 59_144) return IUnlock(0x70B3c9Dd9788570FAAb24B92c3a57d99f8186Cc7); // linea
-      if (block.chainid == 534_352) return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89); // scroll
 
-      else revert UnsupportedNetwork();
+      if (block.chainid == 1) {
+        return IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA);
+      } // ethereum
+      if (block.chainid == 11_155_111) {
+        return IUnlock(0x36b34e10295cCE69B652eEB5a8046041074515Da);
+      } // sepolia
+      if (block.chainid == 10) {
+        return IUnlock(0x99b1348a9129ac49c6de7F11245773dE2f51fB0c);
+      } // optimism
+      if (block.chainid == 42_161) {
+        return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963);
+      } // arbitrum
+      if (block.chainid == 8453) {
+        return IUnlock(0xd0b14797b9D08493392865647384974470202A78);
+      } // base
+      if (block.chainid == 84_532) {
+        return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89);
+      } // base sepolia
+      if (block.chainid == 137) {
+        return IUnlock(0xE8E5cd156f89F7bdB267EabD5C43Af3d5AF2A78f);
+      } // polygon
+      if (block.chainid == 42_220) {
+        return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963);
+      } // celo
+      if (block.chainid == 100) {
+        return IUnlock(0x1bc53f4303c711cc693F6Ec3477B83703DcB317f);
+      } // gnosis
+      if (block.chainid == 59_144) {
+        return IUnlock(0x70B3c9Dd9788570FAAb24B92c3a57d99f8186Cc7);
+      } // linea
+      if (block.chainid == 534_352) {
+        return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89);
+      }
+      // scroll
+      else {
+        revert UnsupportedNetwork();
+      }
     }
   }
 
