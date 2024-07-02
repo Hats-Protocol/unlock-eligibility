@@ -31,8 +31,8 @@ contract UnlockEligibilityTest is Deploy, Test {
   IUnlock public unlockFactory = IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA); // UnlockFactory on mainnet
   IPublicLock public lock;
 
-  address public feeSplitRecipient = makeAddr("fee split recipient");
-  uint256 public feeSplitPercentage = 1000; // 10%
+  address public referrer = makeAddr("referrer");
+  uint256 public referrerFeePercentage = 1000; // 10%
   address public lockManager = makeAddr("lock manager");
 
   address public org = makeAddr("org");
@@ -53,7 +53,7 @@ contract UnlockEligibilityTest is Deploy, Test {
     fork = vm.createSelectFork(vm.rpcUrl(NETWORK), BLOCK_NUMBER);
 
     // deploy implementation via the script
-    prepare(false, MODULE_VERSION, feeSplitRecipient, feeSplitPercentage);
+    prepare(false, MODULE_VERSION, referrer, referrerFeePercentage);
     run();
   }
 }
@@ -157,12 +157,12 @@ contract Deployment is WithInstanceTest {
     assertEq(instance.hatId(), targetHat);
   }
 
-  function test_feeSplitPercentage() public view {
-    assertEq(instance.FEE_SPLIT_PERCENTAGE(), feeSplitPercentage);
+  function test_referrerFeePercentage() public view {
+    assertEq(instance.REFERRER_FEE_PERCENTAGE(), referrerFeePercentage);
   }
 
-  function test_feeSplitRecipient() public view {
-    assertEq(instance.FEE_SPLIT_RECIPIENT(), feeSplitRecipient);
+  function test_referrer() public view {
+    assertEq(instance.REFERRER(), referrer);
   }
 
   function test_createLock() public {
@@ -184,9 +184,6 @@ contract Deployment is WithInstanceTest {
     } else {
       assertEq(lock.publicLockVersion(), lockConfig.version);
     }
-
-    // lock price in module
-    assertEq(instance.keyPrice(), lockConfig.keyPrice);
   }
 
   function test_createLockWithCustomVersion() public {
@@ -209,9 +206,23 @@ contract Deployment is WithInstanceTest {
 }
 
 contract KeyPurchasePrice is WithInstanceTest {
-  function test_keyPurchasePrice() public view {
+  function test_happy() public view {
     uint256 price = instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
     assertEq(price, lockConfig.keyPrice);
+  }
+
+  function test_revert_invalidReferrerFee() public {
+    lock = _getLock();
+
+    // change the referrer fee on the lock
+    vm.prank(lockManager);
+    lock.setReferrerFee(referrer, referrerFeePercentage - 1);
+
+    console2.log("referrer fee set");
+
+    // the purchase price should revert
+    vm.expectRevert(UnlockEligibility.InvalidReferrerFee.selector);
+    instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
   }
 }
 
@@ -306,7 +317,8 @@ contract Transfers is WithInstanceTest {
     uint256 tokenId = _purchaseSingleKey(lock, wearer);
 
     // transfer the key to the non-wearer, expecting a revert
-    vm.expectRevert();
+    vm.expectRevert(UnlockEligibility.NotTransferable.selector);
+    vm.prank(wearer);
     lock.transferFrom(wearer, nonWearer, tokenId);
   }
 }
