@@ -61,7 +61,7 @@ contract DeployInstance is Script {
 
   // default values
   bool internal _verbose = true;
-  address internal _implementation = address(0); // test2
+  address internal _implementation = 0x51C4803BDF1f239E488AA5180f07D4469D33cCa3; // test2
   uint256 internal _saltNonce = 1;
   uint256 internal _hatId = 0x0000014a00010001000000000000000000000000000000000000000000000000;
   address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
@@ -74,7 +74,7 @@ contract DeployInstance is Script {
   uint256 internal _maxNumberOfKeys = 10_000;
   address internal _lockManager = 0x624123ec4A9f48Be7AA8a307a74381E4ea7530D4;
   uint16 internal _version = 0; // will default to 14
-  string internal _lockName = "Hat Lock Test 1";
+  string internal _lockName = "Hat Lock Test 2";
 
   /// @dev Override default values, if desired
   function prepare(
