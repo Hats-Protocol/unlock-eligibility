@@ -14,8 +14,11 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
 
   /// @dev Thrown when this contract is not aware of the Unlock factory for the current network
   error UnsupportedNetwork();
-  error NotLock();
+
+  /// @dev Thrown when a trying to transfer a key from the lock
   error NotTransferable();
+
+  // @dev Thrown when the referrer fee is not set for Hats
   error InvalidReferrerFee();
 
   /// @dev Thrown when a lock-only function is called by an address that is not the lock contract
