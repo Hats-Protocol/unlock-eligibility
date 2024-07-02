@@ -11,7 +11,7 @@ contract Deploy is Script {
 
   // default values
   bool internal _verbose = true;
-  string internal _version = "test1"; // increment this with each new deployment
+  string internal _version = "test2"; // increment this with each new deployment
   address internal _feeSplitRecipient = 0x018e494352a3E68e16d03ed976Fd64134bd82E72;
   uint256 internal _feeSplitPercentage = 1000; // 10%
 
@@ -61,9 +61,9 @@ contract DeployInstance is Script {
 
   // default values
   bool internal _verbose = true;
-  address internal _implementation = 0xBDE01a70419856bfCe2fC7B87f147577F67D593a; // test1
+  address internal _implementation = address(0); // test2
   uint256 internal _saltNonce = 1;
-  uint256 internal _hatId = 0x0000001f00010001000000000000000000000000000000000000000000000000;
+  uint256 internal _hatId = 0x0000014a00010001000000000000000000000000000000000000000000000000;
   address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
   UnlockEligibility.LockConfig internal _lockConfig;
 

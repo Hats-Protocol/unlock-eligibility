@@ -6,9 +6,8 @@ import { HatsEligibilityModule, HatsModule, IHatsEligibility } from "../lib/hats
 import { IPublicLock } from "../lib/unlock/smart-contracts/contracts/interfaces/IPublicLock.sol";
 import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnlock.sol";
 import { ILockKeyPurchaseHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyPurchaseHook.sol";
-import { ILockKeyTransferHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyTransferHook.sol";
 
-contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILockKeyTransferHook {
+contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook {
   /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
   //////////////////////////////////////////////////////////////*/
@@ -194,32 +193,6 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     HATS().mintHat(hatId(), recipient);
   }
 
-  /// @inheritdoc ILockKeyTransferHook
-  function onKeyTransfer(
-    address, /* lockAddress */
-    uint256, /* tokenId */
-    address, /* operator */
-    address from,
-    address to,
-    uint256 /* expirationTimestamp */
-  ) external {
-    // caller must be the lock contract
-    _checkIsLock(msg.sender);
-
-    /// @dev We use the revoke & mint approach here rather than transfer in case the hat is immutable
-
-    // Revoke the hat from the from address (current wearer) without putting them in bad standing
-    /// @dev Will revert if this contract is the hat's eligibility module
-    HATS().setHatWearerStatus(hatId(), from, false, true);
-
-    // Mint the hat to the to address (new wearer)
-    // Since the key has already been transferred, the new wearer is eligible and so minting will succeed
-    /// @dev Will revert if this contract is not an admin of the hat
-    HATS().mintHat(hatId(), to);
-
-    // QUESTION: or should we disallow transfers?
-  }
-
   /*//////////////////////////////////////////////////////////////
                           VIEW FUNCTIONS
   //////////////////////////////////////////////////////////////*/
@@ -233,7 +206,9 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
       return IUnlock(_UNLOCK());
     } else {
       // return the address of the factory based on the chainid
-      if (block.chainid == 1) return IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA);
+      if (block.chainid == 1) return IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA); // ethereum
+      if (block.chainid == 11_155_111) return IUnlock(0x36b34e10295cCE69B652eEB5a8046041074515Da); // sepolia
+
       // TODO add other networks
       else revert UnsupportedNetwork();
     }

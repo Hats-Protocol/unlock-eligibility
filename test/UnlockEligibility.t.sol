@@ -207,18 +207,25 @@ contract OnKeyPurchase is WithInstanceTest {
   }
 }
 
-contract OnKeyTransfer is WithInstanceTest {
-  function test_happy() public { } // TODO
+// contract OnKeyTransfer is WithInstanceTest {
+//   function test_happy() public { } // TODO
 
-  function test_revert_notLock() public {
-    vm.expectRevert(UnlockEligibility.NotLock.selector);
-    instance.onKeyTransfer(address(0), 0, address(0), address(0), address(0), 0);
-  }
-}
+//   function test_revert_notLock() public {
+//     vm.expectRevert(UnlockEligibility.NotLock.selector);
+//     instance.onKeyTransfer(address(0), 0, address(0), address(0), address(0), 0);
+//   }
+// }
 
 // TODO
 contract GetWearerStatus is WithInstanceTest {
-  function _purchaseSingleKey(IPublicLock _lock, address _recipient) internal {
+  function setUp() public override {
+    super.setUp();
+
+    // get the lock
+    lock = IPublicLock(instance.lock());
+  }
+
+  function _purchaseSingleKey(IPublicLock _lock, address _recipient) internal returns (uint256) {
     // give the recipient some ETH
     deal(_recipient, 1 ether);
 
@@ -234,15 +241,17 @@ contract GetWearerStatus is WithInstanceTest {
     bytes[] memory _data = new bytes[](1);
     _data[0] = abi.encode(0);
 
+    // the return array
+    uint256[] memory _tokenIds = new uint256[](1);
+
     // make the purchase, passing in the correct eth value
     vm.prank(_recipient);
-    _lock.purchase{ value: _values[0] }(_values, _recipients, _referrers, _keyManagers, _data);
+    _tokenIds = _lock.purchase{ value: _values[0] }(_values, _recipients, _referrers, _keyManagers, _data);
+
+    return _tokenIds[0];
   }
 
   function test_purchaseKey() public {
-    // get the lock
-    lock = IPublicLock(instance.lock());
-
     // purchase a key for the wearer
     _purchaseSingleKey(lock, wearer);
 
@@ -254,5 +263,14 @@ contract GetWearerStatus is WithInstanceTest {
     (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
     assertTrue(eligible);
     assertTrue(standing);
+  }
+
+  function test_revert_transfer() public {
+    // purchase a key for the wearer
+    uint256 tokenId = _purchaseSingleKey(lock, wearer);
+
+    // transfer the key to the non-wearer, expecting a revert
+    vm.expectRevert();
+    lock.transferFrom(wearer, nonWearer, tokenId);
   }
 }
