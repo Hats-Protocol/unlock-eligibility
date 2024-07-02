@@ -8,7 +8,7 @@ import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnl
 import { ILockKeyPurchaseHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyPurchaseHook.sol";
 import { ILockKeyTransferHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyTransferHook.sol";
 
-contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILockKeyTransferHook {
+contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILockKeyTransferHook {
   /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
   //////////////////////////////////////////////////////////////*/
@@ -35,7 +35,6 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     uint256 keyPrice;
     uint256 maxNumberOfKeys;
     address lockManager;
-    uint16 version;
     string lockName;
   }
 
@@ -44,7 +43,7 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   //////////////////////////////////////////////////////////////*/
 
   /// @notice The default version of the lock contract deploy along with an instance of this module
-  uint16 public constant DEFAULT_LOCK_VERSION = 14;
+  uint16 public constant LOCK_VERSION = 14;
 
   /// @notice The address to split key purchase fees to, set as a referrer on the lock
   address public immutable REFERRER;
@@ -110,9 +109,6 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     // decode init data
     LockConfig memory lockConfig = abi.decode(_initData, (LockConfig));
 
-    // determine the lock version to use, falling back to the default version if the given version is 0
-    uint16 version_ = lockConfig.version == 0 ? DEFAULT_LOCK_VERSION : lockConfig.version;
-
     // encode the lock init data
     bytes memory lockInitData = abi.encodeWithSignature(
       "initialize(address,uint256,address,uint256,uint256,string)",
@@ -125,7 +121,7 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
     );
 
     // create the new lock
-    lock = IPublicLock(getUnlockContract().createUpgradeableLockAtVersion(lockInitData, version_));
+    lock = IPublicLock(getUnlockContract().createUpgradeableLockAtVersion(lockInitData, LOCK_VERSION));
 
     // set this contract as a hook for onKeyPurchase
     lock.setEventHooks({
@@ -216,6 +212,8 @@ contract UnlockEligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILock
   /*//////////////////////////////////////////////////////////////
                           VIEW FUNCTIONS
   //////////////////////////////////////////////////////////////*/
+
+  // TODO move this to deploy script
 
   /// @notice Gets the address of the Unlock factory contract, falling back to hardcoded defaults for each
   /// EVM-equivalent network supported by Unlock Protocol:

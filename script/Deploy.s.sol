@@ -3,10 +3,10 @@ pragma solidity ^0.8.19;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { HatsModuleFactory } from "../lib/hats-module/src/HatsModuleFactory.sol";
-import { UnlockEligibility } from "../src/UnlockEligibility.sol";
+import { UnlockV14Eligibility } from "../src/UnlockV14Eligibility.sol";
 
 contract Deploy is Script {
-  UnlockEligibility public implementation;
+  UnlockV14Eligibility public implementation;
   bytes32 public SALT = bytes32(abi.encode(0x4a75));
 
   // default values
@@ -47,7 +47,7 @@ contract Deploy is Script {
      *       never differs regardless of where its being compiled
      *    2. The provided salt, `SALT`
      */
-    implementation = new UnlockEligibility{ salt: SALT }(_version, _feeSplitRecipient, _feeSplitPercentage);
+    implementation = new UnlockV14Eligibility{ salt: SALT }(_version, _feeSplitRecipient, _feeSplitPercentage);
 
     vm.stopBroadcast();
 
@@ -57,7 +57,7 @@ contract Deploy is Script {
 
 contract DeployInstance is Script {
   HatsModuleFactory public factory = HatsModuleFactory(0x0a3f85fa597B6a967271286aA0724811acDF5CD9);
-  UnlockEligibility public instance;
+  UnlockV14Eligibility public instance;
 
   // default values
   bool internal _verbose = true;
@@ -65,7 +65,7 @@ contract DeployInstance is Script {
   uint256 internal _saltNonce = 1;
   uint256 internal _hatId = 0x0000014a00010001000000000000000000000000000000000000000000000000;
   address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
-  UnlockEligibility.LockConfig internal _lockConfig;
+  UnlockV14Eligibility.LockConfig internal _lockConfig;
 
   // lock config defaults
   uint256 internal _expirationDuration = 7 days;
@@ -73,7 +73,6 @@ contract DeployInstance is Script {
   uint256 internal _keyPrice = 0.0001 ether;
   uint256 internal _maxNumberOfKeys = 10_000;
   address internal _lockManager = 0x624123ec4A9f48Be7AA8a307a74381E4ea7530D4;
-  uint16 internal _version = 0; // will default to 14
   string internal _lockName = "Hat Lock Test 2";
 
   /// @dev Override default values, if desired
@@ -83,7 +82,7 @@ contract DeployInstance is Script {
     uint256 hatId,
     address unlockFactory,
     uint256 saltNonce,
-    UnlockEligibility.LockConfig memory lockConfig
+    UnlockV14Eligibility.LockConfig memory lockConfig
   ) public {
     _verbose = verbose;
     _implementation = implementation;
@@ -107,7 +106,7 @@ contract DeployInstance is Script {
   }
 
   /// @dev Deploy the contract to a deterministic address via forge's create2 deployer factory.
-  function run() public virtual returns (UnlockEligibility) {
+  function run() public virtual returns (UnlockV14Eligibility) {
     vm.startBroadcast(deployer());
 
     // use the default values if the prepared lockConfig is empty
@@ -116,11 +115,10 @@ contract DeployInstance is Script {
       _lockConfig.keyPrice = _keyPrice;
       _lockConfig.maxNumberOfKeys = _maxNumberOfKeys;
       _lockConfig.lockManager = _lockManager;
-      _lockConfig.version = _version;
       _lockConfig.lockName = _lockName;
     }
 
-    instance = UnlockEligibility(
+    instance = UnlockV14Eligibility(
       factory.createHatsModule(
         _implementation,
         _hatId,
