@@ -8,7 +8,7 @@ import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnl
 import { ILockKeyPurchaseHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyPurchaseHook.sol";
 import { ILockKeyTransferHook } from "../lib/unlock/smart-contracts/contracts/interfaces/hooks/ILockKeyTransferHook.sol";
 
-contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILockKeyTransferHook {
+contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, ILockKeyTransferHook {
   /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
   //////////////////////////////////////////////////////////////*/
@@ -57,7 +57,7 @@ contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, IL
 
   /// @notice The Unlock Protocol factory contract
   function unlock() public view returns (IUnlock) {
-    return UnlockV14Eligibility(IMPLEMENTATION()).unlock_();
+    return PublicLockV14Eligibility(IMPLEMENTATION()).unlock_();
   }
 
   /**

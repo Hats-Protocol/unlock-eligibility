@@ -2,14 +2,14 @@
 pragma solidity ^0.8.19;
 
 import { Test, console2 } from "forge-std/Test.sol";
-import { IPublicLock, UnlockV14Eligibility } from "../src/UnlockV14Eligibility.sol";
+import { IPublicLock, PublicLockV14Eligibility } from "../src/PublicLockV14Eligibility.sol";
 import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnlock.sol";
 import { HatsModuleFactory, IHats } from "hats-module/utils/DeployFunctions.sol";
 import { Deploy, DeployInstance } from "../script/Deploy.s.sol";
 import { IHats } from "hats-protocol/Interfaces/IHats.sol";
 import { HatsErrors } from "hats-protocol/Interfaces/HatsErrors.sol";
 
-contract UnlockV14EligibilityTest is Deploy, Test {
+contract PublicLockV14EligibilityTest is Deploy, Test {
   /// @dev Inherit from DeployPrecompiled instead of Deploy if working with pre-compiled contracts
 
   /// @dev variables inhereted from Deploy script
@@ -21,7 +21,7 @@ contract UnlockV14EligibilityTest is Deploy, Test {
   string public NETWORK = "mainnet";
   IHats public HATS = IHats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137); // v1.hatsprotocol.eth
   HatsModuleFactory public factory;
-  UnlockV14Eligibility public instance;
+  PublicLockV14Eligibility public instance;
   bytes public otherImmutableArgs;
   bytes public initArgs;
   uint256 saltNonce;
@@ -46,7 +46,7 @@ contract UnlockV14EligibilityTest is Deploy, Test {
   uint256 public targetHat; // should be worn by {wearer}
 
   // lock init data
-  UnlockV14Eligibility.LockConfig lockConfig;
+  PublicLockV14Eligibility.LockConfig lockConfig;
 
   string public MODULE_VERSION;
 
@@ -100,7 +100,7 @@ contract UnlockV14EligibilityTest is Deploy, Test {
   }
 }
 
-contract WithInstanceTest is UnlockV14EligibilityTest {
+contract WithInstanceTest is PublicLockV14EligibilityTest {
   function setUp() public virtual override {
     super.setUp();
 
@@ -108,7 +108,7 @@ contract WithInstanceTest is UnlockV14EligibilityTest {
     saltNonce = 1;
 
     // set lock init data
-    lockConfig = UnlockV14Eligibility.LockConfig({
+    lockConfig =  PublicLockV14Eligibility.LockConfig({
       expirationDuration: 1 days, // 1 day
       tokenAddress: address(0), // ETH
       keyPrice: 1 ether, // 1 ETH
@@ -331,7 +331,7 @@ contract KeyPurchasePrice is WithInstanceTest {
     console2.log("referrer fee set");
 
     // the purchase price should revert
-    vm.expectRevert(UnlockV14Eligibility.InvalidReferrerFee.selector);
+    vm.expectRevert(PublicLockV14Eligibility.InvalidReferrerFee.selector);
     instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
   }
 }
@@ -352,7 +352,7 @@ contract OnKeyPurchase is WithInstanceTest {
   }
 
   function test_revert_notLock() public {
-    vm.expectRevert(UnlockV14Eligibility.NotLock.selector);
+    vm.expectRevert(PublicLockV14Eligibility.NotLock.selector);
     instance.onKeyPurchase(0, address(0), wearer, address(0), bytes(""), 0, 0);
   }
 }
@@ -427,7 +427,7 @@ contract Transfers is WithInstanceTest {
     uint256 tokenId = _purchaseSingleKey(lock, wearer);
 
     // transfer the key to the non-wearer, expecting a revert
-    vm.expectRevert(UnlockV14Eligibility.NotTransferable.selector);
+    vm.expectRevert(PublicLockV14Eligibility.NotTransferable.selector);
     vm.prank(wearer);
     lock.transferFrom(wearer, nonWearer, tokenId);
   }

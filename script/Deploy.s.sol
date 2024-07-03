@@ -3,10 +3,10 @@ pragma solidity ^0.8.19;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { HatsModuleFactory } from "../lib/hats-module/src/HatsModuleFactory.sol";
-import { IUnlock, UnlockV14Eligibility } from "../src/UnlockV14Eligibility.sol";
+import { IUnlock, PublicLockV14Eligibility } from "../src/PublicLockV14Eligibility.sol";
 
 contract Deploy is Script {
-  UnlockV14Eligibility public implementation;
+  PublicLockV14Eligibility public implementation;
   bytes32 public SALT = bytes32(abi.encode(0x4a75));
 
   // default values
@@ -69,7 +69,7 @@ contract Deploy is Script {
      *    2. The provided salt, `SALT`
      */
     implementation =
-      new UnlockV14Eligibility{ salt: SALT }(_version, getUnlockAddress(), _feeSplitRecipient, _feeSplitPercentage);
+      new PublicLockV14Eligibility{ salt: SALT }(_version, getUnlockAddress(), _feeSplitRecipient, _feeSplitPercentage);
 
     vm.stopBroadcast();
 
@@ -79,7 +79,7 @@ contract Deploy is Script {
 
 contract DeployInstance is Script {
   HatsModuleFactory public factory = HatsModuleFactory(0x0a3f85fa597B6a967271286aA0724811acDF5CD9);
-  UnlockV14Eligibility public instance;
+  PublicLockV14Eligibility public instance;
 
   // default values
   bool internal _verbose = true;
@@ -87,7 +87,7 @@ contract DeployInstance is Script {
   uint256 internal _saltNonce = 1;
   uint256 internal _hatId = 0x0000014a00010001000000000000000000000000000000000000000000000000;
   address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
-  UnlockV14Eligibility.LockConfig internal _lockConfig;
+  PublicLockV14Eligibility.LockConfig internal _lockConfig;
 
   // lock config defaults
   uint256 internal _expirationDuration = 7 days;
@@ -103,7 +103,7 @@ contract DeployInstance is Script {
     address implementation,
     uint256 hatId,
     uint256 saltNonce,
-    UnlockV14Eligibility.LockConfig memory lockConfig
+    PublicLockV14Eligibility.LockConfig memory lockConfig
   ) public {
     _verbose = verbose;
     _implementation = implementation;
@@ -126,7 +126,7 @@ contract DeployInstance is Script {
   }
 
   /// @dev Deploy the contract to a deterministic address via forge's create2 deployer factory.
-  function run() public virtual returns (UnlockV14Eligibility) {
+  function run() public virtual returns (PublicLockV14Eligibility) {
     vm.startBroadcast(deployer());
 
     // use the default values if the prepared lockConfig is empty
@@ -138,7 +138,7 @@ contract DeployInstance is Script {
       _lockConfig.lockName = _lockName;
     }
 
-    instance = UnlockV14Eligibility(
+    instance = PublicLockV14Eligibility(
       factory.createHatsModule(
         _implementation,
         _hatId,
