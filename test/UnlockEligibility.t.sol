@@ -52,11 +52,51 @@ contract UnlockV14EligibilityTest is Deploy, Test {
 
   function setUp() public virtual {
     // create and activate a fork, at BLOCK_NUMBER
-    fork = vm.createSelectFork(vm.rpcUrl(NETWORK), BLOCK_NUMBER);
+    fork = _createForkForNetwork(NETWORK);
 
     // deploy implementation via the script
     prepare(false, MODULE_VERSION, referrer, referrerFeePercentage);
     run();
+  }
+
+  function _getUnlockDeploymentBlock(bytes memory _deploymentData) internal pure returns (uint256) {
+    (,, uint256 blockNumber) = abi.decode(_deploymentData, (uint256, address, uint256));
+    return blockNumber;
+  }
+
+  function _getHatsModuleFactoryDeploymentBlock(bytes memory _deploymentData) internal pure returns (uint256) {
+    (uint256 blockNumber,,) = abi.decode(_deploymentData, (uint256, address, uint256));
+    console2.log("blockNumber", blockNumber);
+    return blockNumber;
+  }
+
+  function _getChainIdForNetwork(string memory _network) internal view returns (uint256) {
+    string memory root = vm.projectRoot();
+    string memory path = string.concat(root, "/script/Chains.json");
+    string memory json = vm.readFile(path);
+    string memory network = string.concat(".", _network);
+    bytes memory data = vm.parseJson(json, network);
+    return abi.decode(data, (uint256));
+  }
+
+  function _getForkBlockForNetwork(string memory _network) internal view returns (uint256) {
+    // get the chainid for the network
+    uint256 chainId = _getChainIdForNetwork(_network);
+
+    // get the deployment data for the network
+    bytes memory deploymentData = Deploy.getDeploymentDataForNetwork(chainId);
+    uint256 unlockBlock = _getUnlockDeploymentBlock(deploymentData);
+    uint256 hatsModuleFactoryBlock = _getHatsModuleFactoryDeploymentBlock(deploymentData);
+    // return the higher of unlock deployment block and hats module factory deployment block
+    return unlockBlock > hatsModuleFactoryBlock ? unlockBlock : hatsModuleFactoryBlock;
+  }
+
+  function _createForkForNetwork(string memory _network) internal returns (uint256) {
+    return vm.createSelectFork(vm.rpcUrl(_network), _getForkBlockForNetwork(_network));
+  }
+
+  function test_mainnet() public {
+    _createForkForNetwork("mainnet");
   }
 }
 
@@ -86,7 +126,7 @@ contract WithInstanceTest is UnlockV14EligibilityTest {
 
     // deploy the instance using the script; this will also create a new lock
     deployInstance = new DeployInstance();
-    deployInstance.prepare(false, address(implementation), targetHat, address(unlockFactory), saltNonce, lockConfig);
+    deployInstance.prepare(false, address(implementation), targetHat, saltNonce, lockConfig);
     instance = deployInstance.run();
 
     // mint the adminHat to the instance so that it can mint the targetHat
@@ -181,6 +221,97 @@ contract Deployment is WithInstanceTest {
 
     // lock version
     assertEq(lock.publicLockVersion(), lockVersion);
+  }
+}
+
+contract DeploymentArbitrum is Deployment {
+  function setUp() public override {
+    // create a new fork for arbitrum
+    fork = _createForkForNetwork("arbitrum");
+
+    super.setUp();
+  }
+
+  function test_arbitrum() public {
+    test_createLock();
+  }
+}
+
+contract DeploymentBase is Deployment {
+  function setUp() public override {
+    // create a new fork for base
+    fork = _createForkForNetwork("base");
+
+    super.setUp();
+  }
+
+  function test_base() public {
+    test_createLock();
+  }
+}
+
+contract DeploymentCelo is Deployment {
+  function setUp() public override {
+    // create a new fork for celo
+    fork = _createForkForNetwork("celo");
+
+    super.setUp();
+  }
+
+  function test_celo() public {
+    test_createLock();
+  }
+}
+
+contract DeploymentGnosis is Deployment {
+  function setUp() public override {
+    // create a new fork for gnosis
+    fork = _createForkForNetwork("gnosis");
+
+    super.setUp();
+  }
+
+  function test_gnosis() public {
+    test_createLock();
+  }
+}
+
+contract DeploymentOptimism is Deployment {
+  function setUp() public override {
+    // create a new fork for optimism
+    fork = _createForkForNetwork("optimism");
+
+    super.setUp();
+  }
+
+  function test_optimism() public {
+    test_createLock();
+  }
+}
+
+contract DeploymentPolygon is Deployment {
+  function setUp() public override {
+    // create a new fork for polygon
+    fork = _createForkForNetwork("polygon");
+
+    super.setUp();
+  }
+
+  function test_polygon() public {
+    test_createLock();
+  }
+}
+
+contract DeploymentSepolia is Deployment {
+  function setUp() public override {
+    // create a new fork for sepolia
+    fork = _createForkForNetwork("sepolia");
+
+    super.setUp();
+  }
+
+  function test_sepolia() public {
+    test_createLock();
   }
 }
 

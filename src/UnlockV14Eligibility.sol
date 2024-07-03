@@ -51,6 +51,15 @@ contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, IL
   /// @notice The percentage of key purchase fees that go to the referrer, in basis points (10000 = 100%)
   uint256 public immutable REFERRER_FEE_PERCENTAGE;
 
+  /// @notice The Unlock Protocol factory contract
+  /// @dev Used only for the implementation contract; for clones/instances, use {unlock}
+  IUnlock public unlock_;
+
+  /// @notice The Unlock Protocol factory contract
+  function unlock() public view returns (IUnlock) {
+    return UnlockV14Eligibility(IMPLEMENTATION()).unlock_();
+  }
+
   /**
    * This contract is a clone with immutable args, which means that it is deployed with a set of
    * immutable storage variables (ie constants). Accessing these constants is cheaper than accessing
@@ -69,15 +78,8 @@ contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, IL
    * 0       | IMPLEMENTATION    | address     | 20      | HatsModule          |
    * 20      | HATS              | address     | 20      | HatsModule          |
    * 40      | hatId             | uint256     | 32      | HatsModule          |
-   * 72      | UNLOCK            | address     | 20      | {this}              |
    * --------------------------------------------------------------------------+
    */
-
-  /// @dev The configured Unlock factory contract address. Overrides the default address for each chain as set in
-  /// {getUnlockContract}.
-  function _UNLOCK() internal pure returns (address) {
-    return (_getArgAddress(72));
-  }
 
   /*//////////////////////////////////////////////////////////////
                             MUTABLE STATE
@@ -95,7 +97,10 @@ contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, IL
   /// @param _referrer The referrer address, which will receive a portion of the fees
   /// @param _referrerFeePercentage The percentage of fees to go to the referrer, in basis points (10000 = 100%)
   /// @dev This is only used to deploy the implementation contract, and should not be used to deploy clones
-  constructor(string memory _version, address _referrer, uint256 _referrerFeePercentage) HatsModule(_version) {
+  constructor(string memory _version, IUnlock _unlock, address _referrer, uint256 _referrerFeePercentage)
+    HatsModule(_version)
+  {
+    unlock_ = _unlock;
     REFERRER = _referrer;
     REFERRER_FEE_PERCENTAGE = _referrerFeePercentage;
   }
@@ -121,7 +126,7 @@ contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, IL
     );
 
     // create the new lock
-    lock = IPublicLock(getUnlockContract().createUpgradeableLockAtVersion(lockInitData, LOCK_VERSION));
+    lock = IPublicLock(unlock().createUpgradeableLockAtVersion(lockInitData, LOCK_VERSION));
 
     // set this contract as a hook for onKeyPurchase
     lock.setEventHooks({
@@ -207,38 +212,6 @@ contract UnlockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook, IL
     uint256 /* expirationTimestamp */
   ) external pure {
     revert NotTransferable();
-  }
-
-  /*//////////////////////////////////////////////////////////////
-                          VIEW FUNCTIONS
-  //////////////////////////////////////////////////////////////*/
-
-  // TODO move this to deploy script
-
-  /// @notice Gets the address of the Unlock factory contract, falling back to hardcoded defaults for each
-  /// EVM-equivalent network supported by Unlock Protocol:
-  /// https://docs.unlock-protocol.com/core-protocol/unlock/networks
-  /// @dev This facilitates lazy configuration for supported networks, while also retaining configuration flexibility.
-  function getUnlockContract() public view returns (IUnlock) {
-    if (_UNLOCK() > address(0)) {
-      return IUnlock(_UNLOCK());
-    } else {
-      // return the address of the factory based on the chainid
-      if (block.chainid == 1) return IUnlock(0xe79B93f8E22676774F2A8dAd469175ebd00029FA); // ethereum
-      if (block.chainid == 11_155_111) return IUnlock(0x36b34e10295cCE69B652eEB5a8046041074515Da); // sepolia
-      if (block.chainid == 10) return IUnlock(0x99b1348a9129ac49c6de7F11245773dE2f51fB0c); // optimism
-      if (block.chainid == 42_161) return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963); // arbitrum
-      if (block.chainid == 8453) return IUnlock(0xd0b14797b9D08493392865647384974470202A78); // base
-      if (block.chainid == 84_532) return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89); // base sepolia
-      if (block.chainid == 137) return IUnlock(0xE8E5cd156f89F7bdB267EabD5C43Af3d5AF2A78f); // polygon
-      if (block.chainid == 42_220) return IUnlock(0x1FF7e338d5E582138C46044dc238543Ce555C963); // celo
-      if (block.chainid == 100) return IUnlock(0x1bc53f4303c711cc693F6Ec3477B83703DcB317f); // gnosis
-      if (block.chainid == 59_144) return IUnlock(0x70B3c9Dd9788570FAAb24B92c3a57d99f8186Cc7); // linea
-      if (block.chainid == 534_352) return IUnlock(0x259813B665C8f6074391028ef782e27B65840d89); // scroll
-
-      // scroll
-      else revert UnsupportedNetwork();
-    }
   }
 
   /*//////////////////////////////////////////////////////////////

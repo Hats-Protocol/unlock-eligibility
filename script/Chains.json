@@ -1,0 +1,13 @@
+{
+  "arbitrum": 42161,
+  "base": 8453,
+  "base sepolia": 84532,
+  "celo": 42220,
+  "gnosis": 100,
+  "linea": 59144,
+  "mainnet": 1,
+  "optimism": 10,
+  "polygon": 137,
+  "scroll": 534352,
+  "sepolia": 11155111
+}

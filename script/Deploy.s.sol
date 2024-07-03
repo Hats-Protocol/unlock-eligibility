@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { HatsModuleFactory } from "../lib/hats-module/src/HatsModuleFactory.sol";
-import { UnlockV14Eligibility } from "../src/UnlockV14Eligibility.sol";
+import { IUnlock, UnlockV14Eligibility } from "../src/UnlockV14Eligibility.sol";
 
 contract Deploy is Script {
   UnlockV14Eligibility public implementation;
@@ -21,6 +21,27 @@ contract Deploy is Script {
     _version = version;
     _feeSplitRecipient = feeSplitRecipient;
     _feeSplitPercentage = feeSplitPercentage;
+  }
+
+  function getDeploymentDataForNetwork(uint256 _chainId) public view returns (bytes memory) {
+    string memory root = vm.projectRoot();
+    string memory path = string.concat(root, "/script/Deployments.json");
+    string memory json = vm.readFile(path);
+    string memory chain = string.concat(".", vm.toString(_chainId));
+    return vm.parseJson(json, chain);
+  }
+
+  function getDeploymentData() public view returns (bytes memory) {
+    return getDeploymentDataForNetwork(block.chainid);
+  }
+
+  function getUnlockAddress() public view returns (IUnlock) {
+    bytes memory params = getDeploymentData();
+
+    // json is parsed in alphabetical order by key
+    (, address unlock,) = abi.decode(params, (uint256, address, uint256));
+
+    return IUnlock(unlock);
   }
 
   /// @dev Set up the deployer via their private key from the environment
@@ -47,7 +68,8 @@ contract Deploy is Script {
      *       never differs regardless of where its being compiled
      *    2. The provided salt, `SALT`
      */
-    implementation = new UnlockV14Eligibility{ salt: SALT }(_version, _feeSplitRecipient, _feeSplitPercentage);
+    implementation =
+      new UnlockV14Eligibility{ salt: SALT }(_version, getUnlockAddress(), _feeSplitRecipient, _feeSplitPercentage);
 
     vm.stopBroadcast();
 
@@ -80,14 +102,12 @@ contract DeployInstance is Script {
     bool verbose,
     address implementation,
     uint256 hatId,
-    address unlockFactory,
     uint256 saltNonce,
     UnlockV14Eligibility.LockConfig memory lockConfig
   ) public {
     _verbose = verbose;
     _implementation = implementation;
     _hatId = hatId;
-    _unlockFactory = unlockFactory;
     _saltNonce = saltNonce;
     _lockConfig = lockConfig;
   }
@@ -122,7 +142,7 @@ contract DeployInstance is Script {
       factory.createHatsModule(
         _implementation,
         _hatId,
-        abi.encodePacked(_unlockFactory), // other immutable args
+        abi.encodePacked(), // other immutable args
         abi.encode(_lockConfig), // init data
         _saltNonce
       )

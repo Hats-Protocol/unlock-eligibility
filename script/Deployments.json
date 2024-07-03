@@ -1,0 +1,57 @@
+{
+  "1": {
+    "hatsModuleFactoryDeploymentBlock": 19467227,
+    "unlock": "0xe79B93f8E22676774F2A8dAd469175ebd00029FA",
+    "unlockDeploymentBlock": 16989080
+  },
+  "11155111": {
+    "hatsModuleFactoryDeploymentBlock": 5516083,
+    "unlock": "0x36b34e10295cCE69B652eEB5a8046041074515Da",
+    "unlockDeploymentBlock": 4381710
+  },
+  "10": {
+    "hatsModuleFactoryDeploymentBlock": 117616123,
+    "unlock": "0x99b1348a9129ac49c6de7F11245773dE2f51fB0c",
+    "unlockDeploymentBlock": 302431
+  },
+  "42161": {
+    "hatsModuleFactoryDeploymentBlock": 191914910,
+    "unlock": "0x1FF7e338d5E582138C46044dc238543Ce555C963",
+    "unlockDeploymentBlock": 17429533
+  },
+  "8453": {
+    "hatsModuleFactoryDeploymentBlock": 12021817,
+    "unlock": "0xd0b14797b9D08493392865647384974470202A78",
+    "unlockDeploymentBlock": 1754071
+  },
+  "84532": {
+    "hatsModuleFactoryDeploymentBlock": 0,
+    "unlock": "0x259813B665C8f6074391028ef782e27B65840d89",
+    "unlockDeploymentBlock": 7889118
+  },
+  "137": {
+    "hatsModuleFactoryDeploymentBlock": 54831711,
+    "unlock": "0xE8E5cd156f89F7bdB267EabD5C43Af3d5AF2A78f",
+    "unlockDeploymentBlock": 21986688
+  },
+  "42220": {
+    "hatsModuleFactoryDeploymentBlock": 24632474,
+    "unlock": "0x1FF7e338d5E582138C46044dc238543Ce555C963",
+    "unlockDeploymentBlock": 13994123
+  },
+  "100": {
+    "hatsModuleFactoryDeploymentBlock": 34772144,
+    "unlock": "0x1bc53f4303c711cc693F6Ec3477B83703DcB317f",
+    "unlockDeploymentBlock": 19338710
+  },
+  "59144": {
+    "hatsModuleFactoryDeploymentBlock": 0,
+    "unlock": "0x70B3c9Dd9788570FAAb24B92c3a57d99f8186Cc7",
+    "unlockDeploymentBlock": 560908
+  },
+  "534352": {
+    "hatsModuleFactoryDeploymentBlock": 0,
+    "unlock": "0x259813B665C8f6074391028ef782e27B65840d89",
+    "unlockDeploymentBlock": 2937782
+  }
+}
