@@ -132,6 +132,7 @@ contract DeployInstance is Script {
     // use the default values if the prepared lockConfig is empty
     if (_lockConfig.expirationDuration == 0) {
       _lockConfig.expirationDuration = _expirationDuration;
+      _lockConfig.tokenAddress = _tokenAddress;
       _lockConfig.keyPrice = _keyPrice;
       _lockConfig.maxNumberOfKeys = _maxNumberOfKeys;
       _lockConfig.lockManager = _lockManager;
