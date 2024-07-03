@@ -66,7 +66,6 @@ contract PublicLockV14EligibilityTest is Deploy, Test {
 
   function _getHatsModuleFactoryDeploymentBlock(bytes memory _deploymentData) internal pure returns (uint256) {
     (uint256 blockNumber,,) = abi.decode(_deploymentData, (uint256, address, uint256));
-    console2.log("blockNumber", blockNumber);
     return blockNumber;
   }
 
@@ -338,17 +337,61 @@ contract KeyPurchasePrice is WithInstanceTest {
 
 contract OnKeyPurchase is WithInstanceTest {
   function test_happy() public {
-    IPublicLock lock = _getLock();
+    lock = _getLock();
 
     // should revert because we're shortcutting the typical flow and calling this function without actually purchasing a
     // key, and so the wearer is not eligible and therefore cannot be minted the hat
-    vm.expectRevert(HatsErrors.NotEligible.selector);
+    vm.expectRevert(PublicLockV14Eligibility.HatMintFailed.selector);
 
     vm.prank(address(lock));
     instance.onKeyPurchase(0, address(0), wearer, address(0), bytes(""), 0, 0);
 
-    // the
+    // the wearer should not have the hat
     assertFalse(HATS.isWearerOfHat(wearer, targetHat));
+  }
+
+  /// @dev This test will follow the natural flow of calling the hook from inside the lock puchase function
+  function test_succeed_alreadyWearingHat() public {
+    lock = _getLock();
+
+    // increase the hat's max supply
+    vm.prank(org);
+    HATS.changeHatMaxSupply(targetHat, 100);
+
+    // remove the hat's eligibility module
+    vm.prank(org);
+    HATS.changeHatEligibility(targetHat, address(1));
+
+    // manually mint the wearer a hat, so the supply of the hat is 1
+    vm.prank(org);
+    HATS.mintHat(targetHat, wearer);
+    assertEq(HATS.hatSupply(targetHat), 1);
+
+    // replace the eligibility module
+    vm.prank(org);
+    HATS.changeHatEligibility(targetHat, address(instance));
+
+    // since the wearer doesn't have a key, they should no longer be eligible, and therefore should not have the hat
+    assertFalse(lock.getHasValidKey(wearer));
+    (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
+    assertFalse(eligible);
+    assertTrue(standing);
+    assertFalse(HATS.isWearerOfHat(wearer, targetHat));
+    // note that this doesn't change the hat's supply since the hat was only dynamically revoked, not fully burned
+    assertEq(HATS.hatSupply(targetHat), 1);
+
+    // now purchase a key for the wearer; this should succeed even though they already have a static balance of the hat
+    _purchaseSingleKey(lock, wearer);
+
+    // the wearer should now have a key, be eligible, and have the hat
+    assertTrue(lock.getHasValidKey(wearer));
+    (eligible, standing) = instance.getWearerStatus(wearer, targetHat);
+    assertTrue(eligible);
+    assertTrue(standing);
+    assertTrue(HATS.isWearerOfHat(wearer, targetHat));
+
+    // the hat supply should still be 1
+    assertEq(HATS.hatSupply(targetHat), 1);
   }
 
   function test_revert_notLock() public {

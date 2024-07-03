@@ -25,6 +25,8 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @dev Thrown when a lock-only function is called by an address that is not the lock contract
   error NotLock();
 
+  error HatMintFailed();
+
   /*//////////////////////////////////////////////////////////////
                             DATA MODELS
   //////////////////////////////////////////////////////////////*/
@@ -185,7 +187,22 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     return lock.keyPrice();
   }
 
-  /// @inheritdoc ILockKeyPurchaseHook
+  /**
+   * @inheritdoc ILockKeyPurchaseHook
+   *
+   * @notice Mints a hat whenever a key is purchased. If the recipient already has the hat, this function will
+   * return without any action, allowing the key purchase to succeed. This logic exists in order to support migration to
+   * a new lock without requiring hats to be revoked or renounced.
+   *
+   * There are two important notes:
+   * 1. This contract must wear an admin hat of the {hatId} in order to be able to mint it.
+   * 2. If the recipient is already wearing the {hatId}, the maxSupply of the hat must be higher than the current
+   *    supply even though there will not be an additional hat minted. This is because, in the {HATS.mintHat} function,
+   *    the maxSupply check occurs prior to the AlreadyWearingHat check. See the Hats Protocol code for details:
+   *    https://github.com/Hats-Protocol/hats-protocol/blob/b4cdfbd964226d342afb1b0c8ebd92e0055f5b60/src/Hats.sol#L246-L247
+   *
+   * @dev Only callable by the {lock} contract
+   */
   function onKeyPurchase(
     uint256, /* tokenId */
     address, /* from */
@@ -198,8 +215,22 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     // caller must be the lock contract
     _checkIsLock(msg.sender);
 
-    /// @dev Will revert if this contract is not an admin of the hat
-    HATS().mintHat(hatId(), recipient);
+    // try to mint the hat to the recipient
+    (bool success, bytes memory returndata) =
+      address(HATS()).call(abi.encodeWithSignature("mintHat(uint256,address)", hatId(), recipient));
+
+    if (!success) {
+      if (
+        // if the mint fails because the recipient is already wearing the hat, do nothing and return
+        keccak256(returndata)
+          == keccak256(abi.encodeWithSignature("AlreadyWearingHat(address,uint256)", recipient, hatId()))
+      ) {
+        return;
+      } else {
+        // if the mint fails for any other reason, revert
+        revert HatMintFailed();
+      }
+    }
   }
 
   /// @inheritdoc ILockKeyTransferHook
