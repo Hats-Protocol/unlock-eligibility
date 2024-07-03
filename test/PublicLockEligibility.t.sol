@@ -108,7 +108,7 @@ contract WithInstanceTest is PublicLockV14EligibilityTest {
     saltNonce = 1;
 
     // set lock init data
-    lockConfig =  PublicLockV14Eligibility.LockConfig({
+    lockConfig = PublicLockV14Eligibility.LockConfig({
       expirationDuration: 1 days, // 1 day
       tokenAddress: address(0), // ETH
       keyPrice: 1 ether, // 1 ETH
