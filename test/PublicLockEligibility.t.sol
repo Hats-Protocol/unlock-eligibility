@@ -475,3 +475,23 @@ contract Transfers is WithInstanceTest {
     lock.transferFrom(wearer, nonWearer, tokenId);
   }
 }
+
+contract KeyPurchaseToken is WithInstanceTest {
+  function test_ETH() public view {
+    assertEq(instance.keyPurchaseToken(), address(0));
+  }
+
+  function test_ERC20() public {
+    lock = _getLock();
+
+    // use a token that definitely has a non-zero total supply
+    address token = 0x6B175474E89094C44Da98b954EedeAC495271d0F; // dai on mainnet
+
+    // update the token address
+    vm.prank(lockManager);
+    lock.updateKeyPricing(lockConfig.keyPrice, token);
+
+    // the new token should be returned
+    assertEq(instance.keyPurchaseToken(), token);
+  }
+}
