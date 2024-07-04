@@ -249,8 +249,19 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
                           VIEW FUNCTIONS
   //////////////////////////////////////////////////////////////*/
 
-  function keyPurchaseToken() public view returns (address) {
+  /// @notice Convenience function to get the key purchase token address from the lock
+  function keyPurchaseToken() external view returns (address) {
     return lock.tokenAddress();
+  }
+
+  /// @notice Convenience function to get the expiration duration from the lock
+  function expirationDuration() external view returns (uint256) {
+    return lock.expirationDuration();
+  }
+
+  /// @notice Convenience function to get the max number of keys from the lock
+  function maxNumberOfKeys() external view returns (uint256) {
+    return lock.maxNumberOfKeys();
   }
 
   /*//////////////////////////////////////////////////////////////

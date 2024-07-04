@@ -495,3 +495,35 @@ contract KeyPurchaseToken is WithInstanceTest {
     assertEq(instance.keyPurchaseToken(), token);
   }
 }
+
+contract ExpirationDuration is WithInstanceTest {
+  function test_happy() public {
+    lock = _getLock();
+
+    assertEq(instance.expirationDuration(), lockConfig.expirationDuration);
+
+    // change the expiration duration
+    uint256 newDuration = lockConfig.expirationDuration + 1;
+    vm.prank(lockManager);
+    lock.updateLockConfig(newDuration, lockConfig.maxNumberOfKeys, 1);
+
+    // the new duration should be returned
+    assertEq(instance.expirationDuration(), newDuration);
+  }
+}
+
+contract MaxNumberOfKeys is WithInstanceTest {
+  function test_happy() public {
+    lock = _getLock();
+
+    assertEq(instance.maxNumberOfKeys(), lockConfig.maxNumberOfKeys);
+
+    // change the max number of keys
+    uint256 newMaxNumberOfKeys = lockConfig.maxNumberOfKeys + 1;
+    vm.prank(lockManager);
+    lock.updateLockConfig(lockConfig.expirationDuration, newMaxNumberOfKeys, 1);
+
+    // the new max number of keys should be returned
+    assertEq(instance.maxNumberOfKeys(), newMaxNumberOfKeys);
+  }
+}
