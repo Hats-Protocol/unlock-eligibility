@@ -7,7 +7,6 @@ import { IUnlock } from "../lib/unlock/smart-contracts/contracts/interfaces/IUnl
 import { HatsModuleFactory, IHats } from "hats-module/utils/DeployFunctions.sol";
 import { Deploy, DeployInstance } from "../script/Deploy.s.sol";
 import { IHats } from "hats-protocol/Interfaces/IHats.sol";
-import { HatsErrors } from "hats-protocol/Interfaces/HatsErrors.sol";
 
 contract PublicLockV14EligibilityTest is Deploy, Test {
   /// @dev Inherit from DeployPrecompiled instead of Deploy if working with pre-compiled contracts

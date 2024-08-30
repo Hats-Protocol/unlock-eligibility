@@ -19,12 +19,13 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @dev Thrown when a trying to transfer a key from the lock
   error NotTransferable();
 
-  // @dev Thrown when the referrer fee is not the same in the lock as in this contract
+  /// @dev Thrown when the referrer fee is not the same in the lock as in this contract
   error InvalidReferrerFee();
 
   /// @dev Thrown when a lock-only function is called by an address that is not the lock contract
   error NotLock();
 
+  /// @dev Thrown when the hat minting fails
   error HatMintFailed();
 
   /*//////////////////////////////////////////////////////////////
