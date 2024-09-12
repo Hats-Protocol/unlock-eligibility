@@ -11,9 +11,9 @@ contract Deploy is Script {
 
   // default values
   bool internal _verbose = true;
-  string internal _version = "test2"; // increment this with each new deployment
-  address internal _feeSplitRecipient = 0x018e494352a3E68e16d03ed976Fd64134bd82E72;
-  uint256 internal _feeSplitPercentage = 1000; // 10%
+  string internal _version = "0.1.0"; // increment this with each new deployment
+  address internal _feeSplitRecipient = 0x58C8854a8E51BdCE9F00726B966905FE2719B4D9;
+  uint256 internal _feeSplitPercentage = 500; // 5%
 
   /// @dev Override default values, if desired
   function prepare(bool verbose, string memory version, address feeSplitRecipient, uint256 feeSplitPercentage) public {
@@ -83,19 +83,19 @@ contract DeployInstance is Script {
 
   // default values
   bool internal _verbose = true;
-  address internal _implementation = 0x51C4803BDF1f239E488AA5180f07D4469D33cCa3; // test2
-  uint256 internal _saltNonce = 1;
-  uint256 internal _hatId = 0x0000014a00010001000000000000000000000000000000000000000000000000;
+  address internal _implementation = 0x13d7ca8F08CDCb248df0792bcC5989509CE119E0; // test3
+  uint256 internal _saltNonce = 2;
+  uint256 internal _hatId = 0x0000020f00010001000000000000000000000000000000000000000000000000;
   address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
   PublicLockV14Eligibility.LockConfig internal _lockConfig;
 
   // lock config defaults
-  uint256 internal _expirationDuration = 7 days;
-  address internal _tokenAddress = 0x0000000000000000000000000000000000000000; // ETH
-  uint256 internal _keyPrice = 0.0001 ether;
+  uint256 internal _expirationDuration = 30 days;
+  address internal _tokenAddress = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238; // USDC
+  uint256 internal _keyPrice = 1_000_000; // 1 USDC
   uint256 internal _maxNumberOfKeys = 10_000;
-  address internal _lockManager = 0x624123ec4A9f48Be7AA8a307a74381E4ea7530D4;
-  string internal _lockName = "Hat Lock Test 2";
+  address internal _lockManager = 0x843a3c4ED93fb1f1335D5d174745551468106715;
+  string internal _lockName = "Subscription Module test3 instance 1";
 
   /// @dev Override default values, if desired
   function prepare(
@@ -160,16 +160,17 @@ contract DeployInstance is Script {
 /* FORGE CLI COMMANDS
 
 ## A. Simulate the deployment locally
-forge script script/Deploy.s.sol -f mainnet
+forge script script/Deploy.s.sol -f sepolia
 
 ## B. Deploy to real network and verify on etherscan
 forge script script/Deploy.s.sol -f mainnet --broadcast --verify
 
 ## C. Fix verification issues (replace values in curly braces with the actual values)
-forge verify-contract --chain-id 1 --num-of-optimizations 1000000 --watch --constructor-args $(cast abi-encode \
- "constructor({args})" "{arg1}" "{arg2}" "{argN}" ) \ 
- --compiler-version v0.8.19 {deploymentAddress} \
- src/{Counter}.sol:{Counter} --etherscan-api-key $ETHERSCAN_KEY
+forge verify-contract --chain-id 11155111 --num-of-optimizations 1000000 --watch --constructor-args $(cast abi-encode \
+"constructor(string,address,address,uint256)" "0.1.0" 0x36b34e10295cCE69B652eEB5a8046041074515Da \
+0x58C8854a8E51BdCE9F00726B966905FE2719B4D9 500 ) --compiler-version v0.8.26 \
+0xA235F37A5e98980Ee439deB0600F06d956707D61 \
+ src/PublicLockV14Eligibility.sol:PublicLockV14Eligibility --etherscan-api-key $ETHERSCAN_KEY
 
 ## D. To verify ir-optimized contracts on etherscan...
   1. Run (C) with the following additional flag: `--show-standard-json-input > etherscan.json`
@@ -178,5 +179,4 @@ forge verify-contract --chain-id 1 --num-of-optimizations 1000000 --watch --cons
   3. Upload the patched `etherscan.json` to etherscan manually
 
   See this github issue for more: https://github.com/foundry-rs/foundry/issues/3507#issuecomment-1465382107
-
 */
