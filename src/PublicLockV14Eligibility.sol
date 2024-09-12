@@ -28,6 +28,16 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @dev Thrown when the hat minting fails
   error HatMintFailed();
 
+  /// @dev Thrown when a non-referrer calls a function only authorized to the referrer
+  error NotReferrer();
+
+  /*//////////////////////////////////////////////////////////////
+                            EVENTS
+  //////////////////////////////////////////////////////////////*/
+
+  /// @notice Emitted when the referrer fee percentage is set in the implementation contract
+  event ImplementationReferrerFeePercentageSet(uint256 referrerFeePercentage);
+
   /*//////////////////////////////////////////////////////////////
                             DATA MODELS
   //////////////////////////////////////////////////////////////*/
@@ -51,9 +61,6 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @notice The address to split key purchase fees to, set as a referrer on the lock
   address public immutable REFERRER;
 
-  /// @notice The percentage of key purchase fees that go to the referrer, in basis points (10000 = 100%)
-  uint256 public immutable REFERRER_FEE_PERCENTAGE;
-
   /// @notice The Unlock Protocol factory contract
   /// @dev Used only for the implementation contract; for clones/instances, use {unlock}
   IUnlock public unlock_;
@@ -62,6 +69,10 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   function unlock() public view returns (IUnlock) {
     return PublicLockV14Eligibility(IMPLEMENTATION()).unlock_();
   }
+
+  /// @notice The referrer fee percentage for this module instance and associated lock. It is set to the value of the
+  /// {implementationReferrerFeePercentage} during {setUp}, and cannot be updated.
+  uint256 public referrerFeePercentage;
 
   /**
    * This contract is a clone with immutable args, which means that it is deployed with a set of
@@ -88,6 +99,10 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
                             MUTABLE STATE
   //////////////////////////////////////////////////////////////*/
 
+  /// @notice The referrer fee percentage that will be used for subsequent instances of this module.
+  /// Will be 0 for all instances; use {referrerFeePercentage} for the fee percentage for a given instance.
+  uint256 public implementationReferrerFeePercentage;
+
   /// @notice The Unlock Protocol lock contract that is created along with this module and coupled to the hat
   IPublicLock public lock;
 
@@ -98,18 +113,18 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @notice Deploy the implementation contract and set its version
   /// @param _version The version of the implementation contract
   /// @param _referrer The referrer address, which will receive a portion of the fees
-  /// @param _referrerFeePercentage The percentage of fees to go to the referrer, in basis points (10000 = 100%)
+  /// @param __referrerFeePercentage The percentage of fees to go to the referrer, in basis points (10000 = 100%)
   /// @dev This is only used to deploy the implementation contract, and should not be used to deploy clones
-  constructor(string memory _version, IUnlock _unlock, address _referrer, uint256 _referrerFeePercentage)
+  constructor(string memory _version, IUnlock _unlock, address _referrer, uint256 __referrerFeePercentage)
     HatsModule(_version)
   {
     unlock_ = _unlock;
     REFERRER = _referrer;
-    REFERRER_FEE_PERCENTAGE = _referrerFeePercentage;
+    implementationReferrerFeePercentage = __referrerFeePercentage;
   }
 
   /*//////////////////////////////////////////////////////////////
-                            INITIALIZOR
+                            INITIALIZER
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc HatsModule
@@ -142,8 +157,12 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
       _onKeyGrantHook: address(0)
     });
 
-    // set referrer fee
-    lock.setReferrerFee(REFERRER, REFERRER_FEE_PERCENTAGE);
+    // set referrer fee percentage in this instance
+    uint256 fee = PublicLockV14Eligibility(IMPLEMENTATION()).implementationReferrerFeePercentage();
+    referrerFeePercentage = fee;
+
+    // set referrer and their fee percentage in the lock
+    lock.setReferrerFee(REFERRER, fee);
 
     // add lock manager role to the configured address
     lock.addLockManager(lockConfig.lockManager);
@@ -180,7 +199,7 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     bytes calldata /* data */
   ) external view returns (uint256 minKeyPrice) {
     // Check if referrer fee is correct. Fail minting if incorrect.
-    if (lock.referrerFees(REFERRER) != REFERRER_FEE_PERCENTAGE) {
+    if (lock.referrerFees(REFERRER) != referrerFeePercentage) {
       revert InvalidReferrerFee();
     }
 
@@ -244,6 +263,25 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     uint256 /* expirationTimestamp */
   ) external pure {
     revert NotTransferable();
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                          ADMIN FUNCTIONS
+  //////////////////////////////////////////////////////////////*/
+
+  /**
+   * @notice Sets the referrer fee percentage on the implementation contract. This value will be used for subsequent
+   * instances of this module. It will not change the referrer fee percentage for existing instances.
+   * @dev This function can only be called by the referrer.
+   * @param _referrerFeePercentage The new referrer fee percentage
+   */
+  function setImplementationReferrerFeePercentage(uint256 _referrerFeePercentage) external {
+    // caller must be the referrer
+    if (msg.sender != REFERRER) revert NotReferrer();
+
+    implementationReferrerFeePercentage = _referrerFeePercentage;
+
+    emit ImplementationReferrerFeePercentageSet(_referrerFeePercentage);
   }
 
   /*//////////////////////////////////////////////////////////////

@@ -196,8 +196,16 @@ contract Deployment is WithInstanceTest {
     assertEq(instance.hatId(), targetHat);
   }
 
-  function test_referrerFeePercentage() public view {
-    assertEq(instance.REFERRER_FEE_PERCENTAGE(), referrerFeePercentage);
+  function test_referrerFeePercentage_instance() public view {
+    assertEq(instance.referrerFeePercentage(), referrerFeePercentage, "wrong instance value");
+
+    assertEq(instance.implementationReferrerFeePercentage(), 0, "wrong implementation value");
+  }
+
+  function test_referrerFeePercentage_implementation() public view {
+    assertEq(implementation.implementationReferrerFeePercentage(), referrerFeePercentage);
+
+    assertEq(implementation.referrerFeePercentage(), 0);
   }
 
   function test_referrer() public view {
@@ -425,7 +433,6 @@ contract GetWearerStatus is WithInstanceTest {
     uint256 key = _purchaseSingleKey(lock, wearer);
 
     // the wearer should be eligible
-
     (bool eligible, bool standing) = instance.getWearerStatus(wearer, targetHat);
     assertTrue(eligible);
     assertTrue(standing);
@@ -524,5 +531,42 @@ contract MaxNumberOfKeys is WithInstanceTest {
 
     // the new max number of keys should be returned
     assertEq(instance.maxNumberOfKeys(), newMaxNumberOfKeys);
+  }
+}
+
+contract SetImplementationReferrerFeePercentage is WithInstanceTest {
+  uint256 public oldFee;
+  uint256 public newFee;
+
+  function setUp() public override {
+    super.setUp();
+
+    oldFee = referrerFeePercentage;
+    newFee = oldFee * 3;
+  }
+
+  function test_referrerCanSet() public {
+    // set the referrer fee percentage
+    vm.expectEmit(true, true, true, true);
+    emit PublicLockV14Eligibility.ImplementationReferrerFeePercentageSet(newFee);
+    vm.prank(referrer);
+    implementation.setImplementationReferrerFeePercentage(newFee);
+
+    // referrer fee percentage for existing instance should not change
+    assertEq(instance.referrerFeePercentage(), oldFee);
+
+    // new instance should have the new referrer fee percentage
+    deployInstance.prepare(false, address(implementation), targetHat, saltNonce + 1, lockConfig);
+    PublicLockV14Eligibility newInstance = deployInstance.run();
+    assertEq(newInstance.referrerFeePercentage(), newFee);
+  }
+
+  function test_revert_nonReferrerCannotSet() public {
+    // try to set the referrer fee percentage, expecting a revert
+    vm.expectRevert(PublicLockV14Eligibility.NotReferrer.selector);
+    vm.prank(makeAddr("non-referrer"));
+    implementation.setImplementationReferrerFeePercentage(newFee);
+
+    assertEq(implementation.implementationReferrerFeePercentage(), oldFee);
   }
 }
