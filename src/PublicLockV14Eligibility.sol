@@ -191,7 +191,7 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     address, /* recipient */
     address, /* referrer */
     bytes calldata /* data */
-  ) external view returns (uint256 minKeyPrice) {
+  ) public view returns (uint256 minKeyPrice) {
     // Check if referrer fee is correct. Fail minting if incorrect.
     if (lock.referrerFees(REFERRER) != referrerFeePercentage) {
       revert InvalidReferrerFee();
@@ -295,6 +295,13 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @notice Convenience function to get the max number of keys from the lock
   function maxNumberOfKeys() external view returns (uint256) {
     return lock.maxNumberOfKeys();
+  }
+
+  /// @notice Convenience function to get the key price from the lock
+  /// @dev This function wraps the main {keyPurchasePrice} function to enable it to be called without arguments, eg by
+  /// the Hats Modules SDK
+  function keyPurchasePrice() external view returns (uint256) {
+    return this.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
   }
 
   /*//////////////////////////////////////////////////////////////

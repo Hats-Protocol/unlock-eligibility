@@ -355,6 +355,10 @@ contract KeyPurchasePrice is WithInstanceTest {
     vm.expectRevert(PublicLockV14Eligibility.InvalidReferrerFee.selector);
     instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
   }
+
+  function test_convenienceFunction() public view {
+    assertEq(instance.keyPurchasePrice(), instance.keyPurchasePrice(address(0), address(0), address(0), bytes("")));
+  }
 }
 
 contract OnKeyPurchase is WithInstanceTest {
