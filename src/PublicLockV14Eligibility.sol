@@ -39,19 +39,6 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   event ImplementationReferrerFeePercentageSet(uint256 referrerFeePercentage);
 
   /*//////////////////////////////////////////////////////////////
-                            DATA MODELS
-  //////////////////////////////////////////////////////////////*/
-
-  struct LockConfig {
-    uint256 expirationDuration;
-    address tokenAddress;
-    uint256 keyPrice;
-    uint256 maxNumberOfKeys;
-    address lockManager;
-    string lockName;
-  }
-
-  /*//////////////////////////////////////////////////////////////
                             CONSTANTS 
   //////////////////////////////////////////////////////////////*/
 
@@ -130,17 +117,24 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @inheritdoc HatsModule
   function _setUp(bytes calldata _initData) internal override {
     // decode init data
-    LockConfig memory lockConfig = abi.decode(_initData, (LockConfig));
+    (
+      uint256 _expirationDuration,
+      address _tokenAddress,
+      uint256 _keyPrice,
+      uint256 _maxNumberOfKeys,
+      address _lockManager,
+      string memory _lockName
+    ) = abi.decode(_initData, (uint256, address, uint256, uint256, address, string));
 
     // encode the lock init data
     bytes memory lockInitData = abi.encodeWithSignature(
       "initialize(address,uint256,address,uint256,uint256,string)",
       address(this),
-      lockConfig.expirationDuration,
-      lockConfig.tokenAddress,
-      lockConfig.keyPrice,
-      lockConfig.maxNumberOfKeys,
-      lockConfig.lockName
+      _expirationDuration,
+      _tokenAddress,
+      _keyPrice,
+      _maxNumberOfKeys,
+      _lockName
     );
 
     // create the new lock
@@ -165,7 +159,7 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     lock.setReferrerFee(REFERRER, fee);
 
     // add lock manager role to the configured address
-    lock.addLockManager(lockConfig.lockManager);
+    lock.addLockManager(_lockManager);
     // revokes itself lock manager
     lock.renounceLockManager();
   }
@@ -197,7 +191,7 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     address, /* recipient */
     address, /* referrer */
     bytes calldata /* data */
-  ) external view returns (uint256 minKeyPrice) {
+  ) public view returns (uint256 minKeyPrice) {
     // Check if referrer fee is correct. Fail minting if incorrect.
     if (lock.referrerFees(REFERRER) != referrerFeePercentage) {
       revert InvalidReferrerFee();
@@ -301,6 +295,13 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @notice Convenience function to get the max number of keys from the lock
   function maxNumberOfKeys() external view returns (uint256) {
     return lock.maxNumberOfKeys();
+  }
+
+  /// @notice Convenience function to get the key price from the lock
+  /// @dev This function wraps the main {keyPurchasePrice} function to enable it to be called without arguments, eg by
+  /// the Hats Modules SDK
+  function keyPurchasePrice() external view returns (uint256) {
+    return this.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
   }
 
   /*//////////////////////////////////////////////////////////////
