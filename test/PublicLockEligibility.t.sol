@@ -45,7 +45,12 @@ contract PublicLockV14EligibilityTest is Deploy, Test {
   uint256 public targetHat; // should be worn by {wearer}
 
   // lock init data
-  PublicLockV14Eligibility.LockConfig lockConfig;
+  uint256 public expirationDuration_;
+  address public tokenAddress_;
+  uint256 public keyPrice_;
+  uint256 public maxNumberOfKeys_;
+  address public lockManager_;
+  string public lockName_;
 
   string public MODULE_VERSION;
 
@@ -106,14 +111,13 @@ contract WithInstanceTest is PublicLockV14EligibilityTest {
     saltNonce = 1;
 
     // set lock init data
-    lockConfig = PublicLockV14Eligibility.LockConfig({
-      expirationDuration: 1 days, // 1 day
-      tokenAddress: address(0), // ETH
-      keyPrice: 1 ether, // 1 ETH
-      maxNumberOfKeys: 10, // 10 keys
-      lockManager: lockManager,
-      lockName: "Unlock Eligibility Test"
-    });
+
+    expirationDuration_ = 1 days; // 1 day
+    tokenAddress_ = address(0); // ETH
+    keyPrice_ = 1 ether; // 1 ETH
+    maxNumberOfKeys_ = 10; // 10 keys
+    lockManager_ = lockManager;
+    lockName_ = "Unlock Eligibility Test";
 
     // set up the hats
     tophat = HATS.mintTopHat(org, "test", "test");
@@ -124,7 +128,18 @@ contract WithInstanceTest is PublicLockV14EligibilityTest {
 
     // deploy the instance using the script; this will also create a new lock
     deployInstance = new DeployInstance();
-    deployInstance.prepare(false, address(implementation), targetHat, saltNonce, lockConfig);
+    deployInstance.prepare(
+      false,
+      address(implementation),
+      targetHat,
+      saltNonce,
+      expirationDuration_,
+      tokenAddress_,
+      keyPrice_,
+      maxNumberOfKeys_,
+      lockManager_,
+      lockName_
+    );
     instance = deployInstance.run();
 
     // mint the adminHat to the instance so that it can mint the targetHat
@@ -218,11 +233,11 @@ contract Deployment is WithInstanceTest {
     // lock config
     assertTrue(lock.isLockManager(address(lockManager)));
     assertFalse(lock.isLockManager(address(instance)));
-    assertEq(lock.keyPrice(), lockConfig.keyPrice);
-    assertEq(lock.maxNumberOfKeys(), lockConfig.maxNumberOfKeys);
-    assertEq(lock.expirationDuration(), lockConfig.expirationDuration);
-    assertEq(lock.name(), lockConfig.lockName);
-    assertEq(lock.tokenAddress(), lockConfig.tokenAddress);
+    assertEq(lock.keyPrice(), keyPrice_);
+    assertEq(lock.maxNumberOfKeys(), maxNumberOfKeys_);
+    assertEq(lock.expirationDuration(), expirationDuration_);
+    assertEq(lock.name(), lockName_);
+    assertEq(lock.tokenAddress(), tokenAddress_);
     assertEq(lock.onKeyPurchaseHook(), address(instance));
 
     // lock version
@@ -324,7 +339,7 @@ contract DeploymentSepolia is Deployment {
 contract KeyPurchasePrice is WithInstanceTest {
   function test_happy() public view {
     uint256 price = instance.keyPurchasePrice(address(0), address(0), address(0), bytes(""));
-    assertEq(price, lockConfig.keyPrice);
+    assertEq(price, keyPrice_);
   }
 
   function test_revert_invalidReferrerFee() public {
@@ -495,7 +510,7 @@ contract KeyPurchaseToken is WithInstanceTest {
 
     // update the token address
     vm.prank(lockManager);
-    lock.updateKeyPricing(lockConfig.keyPrice, token);
+    lock.updateKeyPricing(keyPrice_, token);
 
     // the new token should be returned
     assertEq(instance.keyPurchaseToken(), token);
@@ -506,12 +521,12 @@ contract ExpirationDuration is WithInstanceTest {
   function test_happy() public {
     lock = _getLock();
 
-    assertEq(instance.expirationDuration(), lockConfig.expirationDuration);
+    assertEq(instance.expirationDuration(), expirationDuration_);
 
     // change the expiration duration
-    uint256 newDuration = lockConfig.expirationDuration + 1;
+    uint256 newDuration = expirationDuration_ + 1;
     vm.prank(lockManager);
-    lock.updateLockConfig(newDuration, lockConfig.maxNumberOfKeys, 1);
+    lock.updateLockConfig(newDuration, maxNumberOfKeys_, 1);
 
     // the new duration should be returned
     assertEq(instance.expirationDuration(), newDuration);
@@ -522,12 +537,12 @@ contract MaxNumberOfKeys is WithInstanceTest {
   function test_happy() public {
     lock = _getLock();
 
-    assertEq(instance.maxNumberOfKeys(), lockConfig.maxNumberOfKeys);
+    assertEq(instance.maxNumberOfKeys(), maxNumberOfKeys_);
 
     // change the max number of keys
-    uint256 newMaxNumberOfKeys = lockConfig.maxNumberOfKeys + 1;
+    uint256 newMaxNumberOfKeys = maxNumberOfKeys_ + 1;
     vm.prank(lockManager);
-    lock.updateLockConfig(lockConfig.expirationDuration, newMaxNumberOfKeys, 1);
+    lock.updateLockConfig(expirationDuration_, newMaxNumberOfKeys, 1);
 
     // the new max number of keys should be returned
     assertEq(instance.maxNumberOfKeys(), newMaxNumberOfKeys);
@@ -556,7 +571,18 @@ contract SetImplementationReferrerFeePercentage is WithInstanceTest {
     assertEq(instance.referrerFeePercentage(), oldFee);
 
     // new instance should have the new referrer fee percentage
-    deployInstance.prepare(false, address(implementation), targetHat, saltNonce + 1, lockConfig);
+    deployInstance.prepare(
+      false,
+      address(implementation),
+      targetHat,
+      saltNonce + 1,
+      expirationDuration_,
+      tokenAddress_,
+      keyPrice_,
+      maxNumberOfKeys_,
+      lockManager_,
+      lockName_
+    );
     PublicLockV14Eligibility newInstance = deployInstance.run();
     assertEq(newInstance.referrerFeePercentage(), newFee);
   }

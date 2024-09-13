@@ -39,19 +39,6 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   event ImplementationReferrerFeePercentageSet(uint256 referrerFeePercentage);
 
   /*//////////////////////////////////////////////////////////////
-                            DATA MODELS
-  //////////////////////////////////////////////////////////////*/
-
-  struct LockConfig {
-    uint256 expirationDuration;
-    address tokenAddress;
-    uint256 keyPrice;
-    uint256 maxNumberOfKeys;
-    address lockManager;
-    string lockName;
-  }
-
-  /*//////////////////////////////////////////////////////////////
                             CONSTANTS 
   //////////////////////////////////////////////////////////////*/
 
@@ -130,17 +117,24 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @inheritdoc HatsModule
   function _setUp(bytes calldata _initData) internal override {
     // decode init data
-    LockConfig memory lockConfig = abi.decode(_initData, (LockConfig));
+    (
+      uint256 _expirationDuration,
+      address _tokenAddress,
+      uint256 _keyPrice,
+      uint256 _maxNumberOfKeys,
+      address _lockManager,
+      string memory _lockName
+    ) = abi.decode(_initData, (uint256, address, uint256, uint256, address, string));
 
     // encode the lock init data
     bytes memory lockInitData = abi.encodeWithSignature(
       "initialize(address,uint256,address,uint256,uint256,string)",
       address(this),
-      lockConfig.expirationDuration,
-      lockConfig.tokenAddress,
-      lockConfig.keyPrice,
-      lockConfig.maxNumberOfKeys,
-      lockConfig.lockName
+      _expirationDuration,
+      _tokenAddress,
+      _keyPrice,
+      _maxNumberOfKeys,
+      _lockName
     );
 
     // create the new lock
@@ -165,7 +159,7 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
     lock.setReferrerFee(REFERRER, fee);
 
     // add lock manager role to the configured address
-    lock.addLockManager(lockConfig.lockManager);
+    lock.addLockManager(_lockManager);
     // revokes itself lock manager
     lock.renounceLockManager();
   }

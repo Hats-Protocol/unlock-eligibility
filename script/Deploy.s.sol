@@ -11,7 +11,7 @@ contract Deploy is Script {
 
   // default values
   bool internal _verbose = true;
-  string internal _version = "0.1.0"; // increment this with each new deployment
+  string internal _version = "0.1.1"; // increment this with each new deployment
   address internal _feeSplitRecipient = 0x58C8854a8E51BdCE9F00726B966905FE2719B4D9;
   uint256 internal _feeSplitPercentage = 500; // 5%
 
@@ -87,7 +87,6 @@ contract DeployInstance is Script {
   uint256 internal _saltNonce = 2;
   uint256 internal _hatId = 0x0000020f00010001000000000000000000000000000000000000000000000000;
   address internal _unlockFactory = 0x36b34e10295cCE69B652eEB5a8046041074515Da; // sepolia
-  PublicLockV14Eligibility.LockConfig internal _lockConfig;
 
   // lock config defaults
   uint256 internal _expirationDuration = 30 days;
@@ -103,13 +102,23 @@ contract DeployInstance is Script {
     address implementation,
     uint256 hatId,
     uint256 saltNonce,
-    PublicLockV14Eligibility.LockConfig memory lockConfig
+    uint256 expirationDuration,
+    address tokenAddress,
+    uint256 keyPrice,
+    uint256 maxNumberOfKeys,
+    address lockManager,
+    string memory lockName
   ) public {
     _verbose = verbose;
     _implementation = implementation;
     _hatId = hatId;
     _saltNonce = saltNonce;
-    _lockConfig = lockConfig;
+    _expirationDuration = expirationDuration;
+    _tokenAddress = tokenAddress;
+    _keyPrice = keyPrice;
+    _maxNumberOfKeys = maxNumberOfKeys;
+    _lockManager = lockManager;
+    _lockName = lockName;
   }
 
   /// @dev Set up the deployer via their private key from the environment
@@ -129,22 +138,13 @@ contract DeployInstance is Script {
   function run() public virtual returns (PublicLockV14Eligibility) {
     vm.startBroadcast(deployer());
 
-    // use the default values if the prepared lockConfig is empty
-    if (_lockConfig.expirationDuration == 0) {
-      _lockConfig.expirationDuration = _expirationDuration;
-      _lockConfig.tokenAddress = _tokenAddress;
-      _lockConfig.keyPrice = _keyPrice;
-      _lockConfig.maxNumberOfKeys = _maxNumberOfKeys;
-      _lockConfig.lockManager = _lockManager;
-      _lockConfig.lockName = _lockName;
-    }
-
     instance = PublicLockV14Eligibility(
       factory.createHatsModule(
         _implementation,
         _hatId,
         abi.encodePacked(), // other immutable args
-        abi.encode(_lockConfig), // init data
+        abi.encode(_expirationDuration, _tokenAddress, _keyPrice, _maxNumberOfKeys, _lockManager, _lockName), // init
+          // data
         _saltNonce
       )
     );
