@@ -21,4 +21,3 @@ This repo uses Foundry for development and testing. To get started:
 3. To install dependencies, run `forge install`
 4. To compile the contracts, run `forge build`
 5. To test, run `forge test`
-
