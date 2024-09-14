@@ -1,8 +1,16 @@
-# hats-module-template
+# Public Lock (Unlock Protocol) Modules
 
-Template repo for Hats Module projects.
+This repo contains a Hats Protocol module that adds a subscription to a hat using [Unlock Protocol](https://github.com/unlock-protocol/unlock). The latest version uses [Unlock V14](https://docs.unlock-protocol.com/core-protocol/public-lock/#version-14).
 
 ## Overview and Usage
+
+The Public Lock V14 module enables an organization to require that a user pay a subscription in order to wear a given hat.
+
+It creates a tight coupling between the hat and a lock. When the module is deployed, it creates a new lock contract. The module sets itself as a hook on the lock contract, which is called whenever a key is purchased from the lock contract.
+
+When users purchase a key, they are also automatically minted the hat. To remain eligible for the hat, they must maintain their subscription to the key.
+
+The module must serve as both a Hats eligibility module and a hatter contract. To mint the target hat when a user purchases a new key, it must be an amin of hte target hat — i.e. wear one of the target hat's admin hats — which makes it a hatter contract. To control eligibility for the target hat, it must also be set as the eligibility module for the target hat.
 
 ## Development
 
@@ -14,12 +22,3 @@ This repo uses Foundry for development and testing. To get started:
 4. To compile the contracts, run `forge build`
 5. To test, run `forge test`
 
-### IR-Optimized Builds
-
-This repo also supports contracts compiled via IR. Since compiling all contracts via IR would slow down testing workflows, we only want to do this for our target contract(s), not anything in this `test` or `script` stack. We accomplish this by pre-compiled the target contract(s) and then loading the pre-compiled artifacts in the test suite.
-
-First, we compile the target contract(s) via IR by running`FOUNDRY_PROFILE=optimized forge build` (ensuring that FOUNDRY_PROFILE is not in our .env file)
-
-Next, ensure that tests are using the `DeployOptimized` script, and run `forge test` as normal.
-
-See the wonderful [Seaport repo](https://github.com/ProjectOpenSea/seaport/blob/main/README.md#foundry-tests) for more details and options for this approach.
