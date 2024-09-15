@@ -17,7 +17,7 @@ contract PublicLockV14EligibilityTest is Deploy, Test {
 
   uint256 public fork;
   uint256 public BLOCK_NUMBER = 19_467_227; // deployment block for HatsModuleFactory v0.7.0
-  string public NETWORK = "mainnet";
+
   IHats public HATS = IHats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137); // v1.hatsprotocol.eth
   HatsModuleFactory public factory;
   PublicLockV14Eligibility public instance;
@@ -55,8 +55,11 @@ contract PublicLockV14EligibilityTest is Deploy, Test {
   string public MODULE_VERSION;
 
   function setUp() public virtual {
-    // create and activate a fork, at BLOCK_NUMBER
-    fork = _createForkForNetwork(NETWORK);
+    // create and activate a fork, unless we're already on a fork
+    // 31337 is the chain id for the default local network
+    if (block.chainid == 31_337) {
+      fork = _createForkForNetwork("mainnet");
+    }
 
     // deploy implementation via the script
     prepare(false, MODULE_VERSION, referrer, referrerFeePercentage);
@@ -97,10 +100,6 @@ contract PublicLockV14EligibilityTest is Deploy, Test {
   function _createForkForNetwork(string memory _network) internal returns (uint256) {
     return vm.createSelectFork(vm.rpcUrl(_network), _getForkBlockForNetwork(_network));
   }
-
-  function test_mainnet() public {
-    _createForkForNetwork("mainnet");
-  }
 }
 
 contract WithInstanceTest is PublicLockV14EligibilityTest {
@@ -111,7 +110,6 @@ contract WithInstanceTest is PublicLockV14EligibilityTest {
     saltNonce = 1;
 
     // set lock init data
-
     expirationDuration_ = 1 days; // 1 day
     tokenAddress_ = address(0); // ETH
     keyPrice_ = 1 ether; // 1 ETH
@@ -243,6 +241,51 @@ contract Deployment is WithInstanceTest {
     // lock version
     assertEq(lock.publicLockVersion(), lockVersion);
   }
+
+  function test_revert_setUnlock() public {
+    address unlockTry = makeAddr("unlockTry");
+
+    vm.prank(deployer());
+    vm.expectRevert(PublicLockV14Eligibility.ImplementationAlreadyInitialized.selector);
+    implementation.setUnlock(IUnlock(unlockTry));
+  }
+}
+
+contract SetUnlock is PublicLockV14EligibilityTest {
+  PublicLockV14Eligibility public newImplementation;
+  bytes32 public newSalt = keccak256(abi.encode(1));
+  address unlockTry = makeAddr("unlockTry");
+
+  function setUp() public override {
+    super.setUp();
+
+    // deploy a new implementation contract
+    newImplementation =
+      new PublicLockV14Eligibility{ salt: newSalt }(_version, _feeSplitRecipient, _feeSplitPercentage, deployer());
+  }
+
+  function test_happy() public {
+    // set the new implementation contract's unlock address
+    vm.prank(deployer());
+    newImplementation.setUnlock(IUnlock(unlockTry));
+  }
+
+  function test_revert_notInitializer() public {
+    // try to set the unlock address from an arbitrary address, expect a revert
+    vm.expectRevert(PublicLockV14Eligibility.NotInitializer.selector);
+    newImplementation.setUnlock(IUnlock(unlockTry));
+  }
+
+  function test_revert_alreadyInitialized() public {
+    // // set the new implementation contract's unlock address
+    vm.prank(deployer());
+    newImplementation.setUnlock(IUnlock(unlockTry));
+
+    // try to set the unlock address from an authorized address, expect a revert now that its already initialized
+    vm.prank(deployer());
+    vm.expectRevert(PublicLockV14Eligibility.ImplementationAlreadyInitialized.selector);
+    newImplementation.setUnlock(IUnlock(unlockTry));
+  }
 }
 
 contract DeploymentArbitrum is Deployment {
@@ -255,6 +298,8 @@ contract DeploymentArbitrum is Deployment {
 
   function test_arbitrum() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
@@ -268,6 +313,8 @@ contract DeploymentBase is Deployment {
 
   function test_base() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
@@ -281,6 +328,8 @@ contract DeploymentCelo is Deployment {
 
   function test_celo() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
@@ -294,6 +343,8 @@ contract DeploymentGnosis is Deployment {
 
   function test_gnosis() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
@@ -307,6 +358,8 @@ contract DeploymentOptimism is Deployment {
 
   function test_optimism() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
@@ -320,6 +373,8 @@ contract DeploymentPolygon is Deployment {
 
   function test_polygon() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
@@ -333,6 +388,8 @@ contract DeploymentSepolia is Deployment {
 
   function test_sepolia() public {
     test_createLock();
+    console2.log("chainid", block.chainid);
+    console2.log("implementation", address(implementation));
   }
 }
 
