@@ -11,7 +11,7 @@ contract Deploy is Script {
 
   // default values
   bool internal _verbose = true;
-  string internal _version = "0.1.1"; // increment this with each new deployment
+  string internal _version = "0.1.2"; // increment this with each new deployment
   address internal _feeSplitRecipient = 0x58C8854a8E51BdCE9F00726B966905FE2719B4D9;
   uint256 internal _feeSplitPercentage = 500; // 5%
 
@@ -69,7 +69,10 @@ contract Deploy is Script {
      *    2. The provided salt, `SALT`
      */
     implementation =
-      new PublicLockV14Eligibility{ salt: SALT }(_version, getUnlockAddress(), _feeSplitRecipient, _feeSplitPercentage);
+      new PublicLockV14Eligibility{ salt: SALT }(_version, _feeSplitRecipient, _feeSplitPercentage, deployer());
+
+    // set the unlock address on the implementation
+    implementation.setUnlock(getUnlockAddress());
 
     vm.stopBroadcast();
 

@@ -31,6 +31,12 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @dev Thrown when a non-referrer calls a function only authorized to the referrer
   error NotReferrer();
 
+  /// @dev Thrown when the implementation contract has already been initialized
+  error ImplementationAlreadyInitialized();
+
+  /// @dev Thrown when a non-initializer calls a function that can only be called by the initializer
+  error NotInitializer();
+
   /*//////////////////////////////////////////////////////////////
                             EVENTS
   //////////////////////////////////////////////////////////////*/
@@ -93,6 +99,13 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @notice The Unlock Protocol lock contract that is created along with this module and coupled to the hat
   IPublicLock public lock;
 
+  /// @notice The address authorized to initialize the implementation contract by setting the Unlock Protocol factory
+  /// contract address
+  address internal _initializer;
+
+  /// @notice Whether the implementation contract has been initialized
+  bool internal _implementationInitialized;
+
   /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
   //////////////////////////////////////////////////////////////*/
@@ -101,17 +114,40 @@ contract PublicLockV14Eligibility is HatsEligibilityModule, ILockKeyPurchaseHook
   /// @param _version The version of the implementation contract
   /// @param _referrer The referrer address, which will receive a portion of the fees
   /// @param __referrerFeePercentage The percentage of fees to go to the referrer, in basis points (10000 = 100%)
+  /// @param __initializer The address authorized to initialize the implementation contract by setting the Unlock
+  /// Protocol factory contract address
   /// @dev This is only used to deploy the implementation contract, and should not be used to deploy clones
-  constructor(string memory _version, IUnlock _unlock, address _referrer, uint256 __referrerFeePercentage)
+  constructor(string memory _version, address _referrer, uint256 __referrerFeePercentage, address __initializer)
     HatsModule(_version)
   {
-    unlock_ = _unlock;
     REFERRER = _referrer;
     implementationReferrerFeePercentage = __referrerFeePercentage;
+    _initializer = __initializer;
   }
 
   /*//////////////////////////////////////////////////////////////
-                            INITIALIZER
+                    IMPLEMENTATION INITIALIZER
+  //////////////////////////////////////////////////////////////*/
+
+  /// @notice Sets the Unlock Protocol factory contract. This function must be called before instances can be created.
+  /// @dev This function can only be called once by the initializer
+  /// @param _unlock The Unlock Protocol factory contract
+  function setUnlock(IUnlock _unlock) external {
+    // caller must be the initializer
+    if (msg.sender != _initializer) revert NotInitializer();
+
+    // the implementationcontract must not be initialized
+    if (_implementationInitialized) revert ImplementationAlreadyInitialized();
+
+    // prevent re-initialization
+    _implementationInitialized = true;
+
+    // set the unlock contract
+    unlock_ = _unlock;
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                            INSTANCE INITIALIZER
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc HatsModule
